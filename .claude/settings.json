@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Project subscribes to the ai-team plugin (per game-night-pwa ADR-0015). The plugin ships the hook scripts, subagent definitions, and slash commands. This file only carries: (1) the marketplace subscription so the project is self-documenting, (2) the permissions block (plugin settings.json cannot ship permissions per Claude Code's plugin spec).",
+
+  "extraKnownMarketplaces": {
+    "agentic-dev-environment": {
+      "source": {
+        "source": "github",
+        "repo": "jaetill/agentic-dev-environment"
+      }
+    }
+  },
+
+  "enabledPlugins": {
+    "ai-team@agentic-dev-environment": true
+  },
+
+  "permissions": {
+    "allow": [],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(sudo rm*)",
+      "Bash(git push --force*)",
+      "Bash(*DROP TABLE*)",
+      "Bash(*TRUNCATE*)",
+      "Edit(data/plan.json)",
+      "Write(data/plan.json)",
+      "Edit(.env)",
+      "Write(.env)",
+      "Edit(api-key.local)",
+      "Write(api-key.local)"
+    ]
+  }
+}

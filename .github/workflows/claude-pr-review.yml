@@ -1,0 +1,43 @@
+name: claude-pr-review
+
+# Runs the Claude code-review action on every PR. Inlined (not a reusable-workflow reference)
+# because the agentic-dev-environment platform repo isn't published as a public workflow — same
+# pattern as sibling project game-night-pwa.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: claude-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The action's default behavior posts a summary review comment on the PR.
+          # Reviewer prompt is project-aware: secret discipline, no-backend principle, idempotent sync.
+          direct_prompt: |
+            Review this PR with the project's standards in mind:
+            - No `data/plan.json` or PL Plugin API key may land in the repo. Flag any path or string that looks like real financial data.
+            - The userscript must stay vanilla JS, single-file IIFE. No bundler/framework additions.
+            - Tests are tiered (sync.js + auth.js at 90/80; UI at 60/50; default 80/70). Flag drops in coverage.
+            - No remote telemetry. No Sentry. No network calls beyond `window.projectionlabPluginAPI`.
+            - The `// ==UserScript==` metadata block must be intact and Prettier-ignored.
+            Identify blocking issues, suggest improvements, and note any deviation from ADR-0001.

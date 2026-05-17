@@ -1,0 +1,27 @@
+name: release
+
+# Inlined release-please workflow (the agentic-dev-environment platform isn't published
+# as a public reusable workflow). On merge to main, opens or updates a release PR.
+# Merging the release PR creates a Git tag like v0.2.0, which triggers deploy-userscript.yml.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json

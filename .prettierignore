@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+site/
+.claude/
+# Userscript metadata header must not be reflowed.
+# The whole file is preserved; sync.js etc. (if split out) ARE formatted.
+userscript/pl-sync.user.js
+userscript/header.template.js
+data/plan.json
+*.local
+CHANGELOG.md
+# Pre-commit config contains a multi-line bash one-liner Prettier can't parse safely.
+.pre-commit-config.yaml

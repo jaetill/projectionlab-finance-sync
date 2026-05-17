@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+
+# Testing / coverage
+coverage/
+.vitest-cache/
+
+# CRITICAL — financial data, never commit
+data/plan.json
+api-key.local
+*.local
+
+# Environment files (we don't ship any, but defensive)
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# MkDocs
+site/
+
+# Pre-commit
+.pre-commit-cache/
+
+# ESLint / Prettier caches
+.eslintcache
+.prettiercache
+
+# Claude / AI runtime
+.claude/audit.log
+.claude/sessions/
+.claude/last-test-result

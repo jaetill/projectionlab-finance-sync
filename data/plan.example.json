@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-05-11T00:00:00Z",
+  "asOfDate": "2026-05-11",
+  "accounts": [
+    {
+      "name": "Acme Brokerage Taxable",
+      "type": "TAXABLE_BROKERAGE",
+      "balance": 100000.0,
+      "currency": "USD",
+      "owner": "self"
+    },
+    {
+      "name": "Acme 401k",
+      "type": "TRADITIONAL_401K",
+      "balance": 200000.0,
+      "currency": "USD",
+      "owner": "self"
+    },
+    {
+      "name": "Acme HYSA",
+      "type": "SAVINGS",
+      "balance": 25000.0,
+      "currency": "USD",
+      "owner": "self"
+    }
+  ],
+  "income": [
+    {
+      "label": "Day job salary",
+      "amount": 100000.0,
+      "frequency": "ANNUAL",
+      "startDate": "2026-01-01",
+      "endDate": null,
+      "growthRate": 0.03
+    }
+  ],
+  "expenses": [
+    {
+      "label": "Living expenses",
+      "amount": 60000.0,
+      "frequency": "ANNUAL",
+      "category": "ESSENTIAL"
+    },
+    {
+      "label": "Discretionary",
+      "amount": 12000.0,
+      "frequency": "ANNUAL",
+      "category": "DISCRETIONARY"
+    }
+  ],
+  "milestones": [
+    {
+      "label": "Mortgage paid off",
+      "date": "2032-06-01",
+      "kind": "DEBT_PAID"
+    },
+    {
+      "label": "Retirement",
+      "date": "2040-01-01",
+      "kind": "RETIREMENT"
+    }
+  ]
+}

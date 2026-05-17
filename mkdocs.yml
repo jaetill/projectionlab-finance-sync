@@ -1,0 +1,67 @@
+site_name: projectionlab-finance-sync
+site_description: Tampermonkey userscript that syncs financial data into ProjectionLab.
+site_url: https://jaetill.github.io/projectionlab-finance-sync/
+repo_url: https://github.com/jaetill/projectionlab-finance-sync
+repo_name: jaetill/projectionlab-finance-sync
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.expand
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Plugin API cheatsheet: pl-api-cheatsheet.md
+      - Account mapping: account-mapping.md
+  - Runbooks:
+      - Index: runbooks/index.md
+      - Install: runbooks/install.md
+      - Key rotation: runbooks/key-rotation.md
+      - Plan regeneration: runbooks/plan-regeneration.md
+      - Pages republish: runbooks/pages-republish.md
+      - Secret leak: runbooks/secret-leak.md
+      - Incident response: runbooks/incident-response.md
+  - Decisions:
+      - Index: adr/index.md
+      - Template: adr/template.md
+      - 0001 — Platform adoption: adr/0001-platform-adoption.md
+      - Running log: decisions.md
+
+strict: true
