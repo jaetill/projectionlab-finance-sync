@@ -1,64 +1,406 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-05-11T00:00:00Z",
-  "asOfDate": "2026-05-11",
-  "accounts": [
+  "_meta": {
+    "note": "Sanitized example. All values are fake (Acme, round numbers). Real plan.json mirrors PL's exportData() output — see data/README.md.",
+    "schemaVersion": 2,
+    "generatedAt": "2026-05-18T00:00:00Z"
+  },
+  "today": {
+    "schema": 4.6,
+    "partnerStatus": "couple",
+    "age": 50,
+    "birthYear": 1976,
+    "birthMonth": 1,
+    "yourName": "Acme You",
+    "yourColor": "ink",
+    "yourIcon": "mdi-face-shimmer",
+    "spouseAge": 50,
+    "spouseAgeGap": 0,
+    "spouseBirthYear": 1976,
+    "spouseBirthMonth": 1,
+    "spouseName": "Acme Spouse",
+    "spouseColor": "blue-grey-lighten-1",
+    "spouseIcon": "mdi-face-shimmer-outline",
+    "savingsAccounts": [
+      {
+        "id": "acct-acme-hysa-0001",
+        "name": "Acme High-Yield Savings",
+        "title": "Acme HYSA",
+        "type": "savings",
+        "balance": 50000,
+        "owner": "joint",
+        "color": "blue-grey",
+        "icon": "mdi-bank",
+        "liquid": true,
+        "withdraw": false,
+        "repurpose": false,
+        "withdrawAge": { "type": "age", "value": "65", "modifier": "default" },
+        "dividendRate": 4,
+        "dividendType": "percent",
+        "investmentGrowthRate": 0,
+        "investmentGrowthType": "percent"
+      }
+    ],
+    "investmentAccounts": [
+      {
+        "id": "acct-acme-ira-0001",
+        "name": "Acme Traditional IRA",
+        "title": "Acme IRA",
+        "type": "ira",
+        "balance": 250000,
+        "owner": "self",
+        "color": "indigo",
+        "icon": "mdi-chart-line",
+        "country": "us",
+        "liquid": false,
+        "withdraw": false,
+        "rmdType": "auto",
+        "withdrawAge": { "type": "age", "value": "65", "modifier": "default" },
+        "dividendRate": 0,
+        "dividendType": "percent",
+        "investmentGrowthRate": 7,
+        "investmentGrowthType": "percent",
+        "yearlyFee": 0,
+        "yearlyFeeType": "percent",
+        "hasEWPenalty": true,
+        "EWPenaltyRate": 10,
+        "EWAge": 59,
+        "subtitle": ""
+      },
+      {
+        "id": "acct-acme-roth-0001",
+        "name": "Acme Roth IRA",
+        "title": "Acme Roth",
+        "type": "roth-ira",
+        "balance": 150000,
+        "owner": "self",
+        "color": "deep-purple",
+        "icon": "mdi-chart-line-variant",
+        "country": "us",
+        "liquid": false,
+        "withdraw": false,
+        "rmdType": "auto",
+        "withdrawAge": { "type": "age", "value": "65", "modifier": "default" },
+        "dividendRate": 0,
+        "dividendType": "percent",
+        "investmentGrowthRate": 7,
+        "investmentGrowthType": "percent",
+        "yearlyFee": 0,
+        "yearlyFeeType": "percent",
+        "hasEWPenalty": true,
+        "EWPenaltyRate": 10,
+        "EWAge": 59,
+        "subtitle": ""
+      },
+      {
+        "id": "acct-acme-taxable-0001",
+        "name": "Acme Taxable Brokerage",
+        "title": "Acme Brokerage",
+        "type": "taxable",
+        "balance": 100000,
+        "owner": "joint",
+        "color": "teal",
+        "icon": "mdi-finance",
+        "country": "us",
+        "liquid": true,
+        "withdraw": false,
+        "rmdType": "none",
+        "withdrawAge": { "type": "age", "value": "65", "modifier": "default" },
+        "dividendRate": 2,
+        "dividendType": "percent",
+        "investmentGrowthRate": 6,
+        "investmentGrowthType": "percent",
+        "yearlyFee": 0,
+        "yearlyFeeType": "percent",
+        "hasEWPenalty": false,
+        "EWPenaltyRate": 0,
+        "EWAge": 0,
+        "subtitle": ""
+      }
+    ],
+    "debts": [],
+    "assets": [
+      {
+        "id": "asset-acme-home-0001",
+        "name": "Acme Primary Residence",
+        "title": "Primary Home",
+        "type": "home",
+        "subtype": "primary",
+        "classification": "real-estate",
+        "balance": 400000,
+        "balanceType": "today$",
+        "amount": 0,
+        "amountType": "today$",
+        "owner": "joint",
+        "color": "brown",
+        "icon": "mdi-home",
+        "initialValue": 400000,
+        "initialValueType": "today$",
+        "downPayment": 0,
+        "downPaymentType": "today$",
+        "interestRate": 0,
+        "interestType": "percent",
+        "monthlyPayment": 0,
+        "monthlyPaymentType": "today$",
+        "monthlyHOA": 0,
+        "monthlyHOAType": "today$",
+        "insuranceRate": 0.5,
+        "insuranceRateType": "percent",
+        "maintenanceRate": 1,
+        "maintenanceRateType": "percent",
+        "managementRate": 0,
+        "managementRateType": "percent",
+        "improvementRate": 0,
+        "improvementRateType": "percent",
+        "taxRate": 1.2,
+        "taxRateType": "percent",
+        "assessedValue": 400000,
+        "assessedValueType": "today$",
+        "assessedValueGrowthRateLimit": 0,
+        "assessedValueGrowthRateLimitType": "percent",
+        "initialBuildingValue": 300000,
+        "initialBuildingValueType": "today$",
+        "yearlyChange": {
+          "type": "appreciation",
+          "amount": 3.0,
+          "amountType": "percent",
+          "limitEnabled": false,
+          "limitType": "today$",
+          "limit": 0
+        },
+        "start": { "type": "today", "value": "today" },
+        "end": { "type": "never", "value": "never" },
+        "compounding": "monthly",
+        "paymentMethod": "fixed",
+        "isPassiveIncome": false,
+        "generateIncome": false,
+        "incomeRate": 0,
+        "incomeRateType": "percent",
+        "percentRented": 0,
+        "cancelRent": false,
+        "estimateRentalDeductions": false,
+        "estimateQBI": false,
+        "selfEmployment": false,
+        "excludeLoanFromLNW": false,
+        "sellIfNeeded": false,
+        "repeat": false,
+        "order": 0,
+        "brokersFee": 6.0,
+        "planPath": ""
+      }
+    ],
+    "location": { "country": "us", "state": "TX" },
+    "tab": 0,
+    "lastUpdated": 1779000000000
+  },
+  "plans": [
     {
-      "name": "Acme Brokerage Taxable",
-      "type": "TAXABLE_BROKERAGE",
-      "balance": 100000.0,
-      "currency": "USD",
-      "owner": "self"
-    },
-    {
-      "name": "Acme 401k",
-      "type": "TRADITIONAL_401K",
-      "balance": 200000.0,
-      "currency": "USD",
-      "owner": "self"
-    },
-    {
-      "name": "Acme HYSA",
-      "type": "SAVINGS",
-      "balance": 25000.0,
-      "currency": "USD",
-      "owner": "self"
-    }
-  ],
-  "income": [
-    {
-      "label": "Day job salary",
-      "amount": 100000.0,
-      "frequency": "ANNUAL",
-      "startDate": "2026-01-01",
-      "endDate": null,
-      "growthRate": 0.03
-    }
-  ],
-  "expenses": [
-    {
-      "label": "Living expenses",
-      "amount": 60000.0,
-      "frequency": "ANNUAL",
-      "category": "ESSENTIAL"
-    },
-    {
-      "label": "Discretionary",
-      "amount": 12000.0,
-      "frequency": "ANNUAL",
-      "category": "DISCRETIONARY"
-    }
-  ],
-  "milestones": [
-    {
-      "label": "Mortgage paid off",
-      "date": "2032-06-01",
-      "kind": "DEBT_PAID"
-    },
-    {
-      "label": "Retirement",
-      "date": "2040-01-01",
-      "kind": "RETIREMENT"
+      "id": "plan-acme-current",
+      "name": "Acme Current Path",
+      "active": true,
+      "schema": 4.6,
+      "icon": "mdi-chart-areaspline",
+      "initialized": true,
+      "hasNotes": false,
+      "simKey": 1,
+      "startingConditionsType": "default",
+      "startingConditions": {},
+      "computedMilestones": [],
+      "milestones": [
+        {
+          "id": "milestone-acme-your-retirement",
+          "name": "Your Retirement",
+          "icon": "mdi-beach",
+          "color": "amber",
+          "criteria": [{ "type": "year", "value": "2040-01-01" }]
+        },
+        {
+          "id": "milestone-acme-spouse-retirement",
+          "name": "Spouse's Retirement",
+          "icon": "mdi-beach",
+          "color": "amber-lighten-1",
+          "criteria": [{ "type": "year", "value": "2040-01-01" }]
+        },
+        {
+          "id": "milestone-acme-your-life",
+          "name": "Your Life Expectancy",
+          "icon": "mdi-heart-pulse",
+          "color": "grey",
+          "criteria": [{ "type": "year", "value": "2060-01-01" }]
+        },
+        {
+          "id": "milestone-acme-spouse-life",
+          "name": "Spouse's Life Expectancy",
+          "icon": "mdi-heart-pulse",
+          "color": "grey-lighten-1",
+          "criteria": [{ "type": "year", "value": "2060-01-01" }]
+        },
+        {
+          "id": "milestone-acme-fi",
+          "name": "Financial Independence",
+          "icon": "mdi-piggy-bank",
+          "color": "green",
+          "criteria": [
+            { "type": "spending", "operator": "<=", "value": 80000, "valueType": "today$" }
+          ]
+        }
+      ],
+      "income": {
+        "events": [
+          {
+            "id": "income-acme-salary",
+            "name": "Acme Salary",
+            "type": "salary",
+            "owner": "self",
+            "amount": 120000,
+            "amountType": "today$",
+            "frequency": "yearly",
+            "frequencyChoices": false,
+            "taxCharacter": "ordinary",
+            "taxExempt": false,
+            "withholdingMode": "auto",
+            "icon": "mdi-cash",
+            "planPath": "",
+            "start": { "type": "today", "value": "today" },
+            "end": { "type": "milestone", "value": "milestone-acme-your-retirement" },
+            "yearlyChange": {
+              "type": "raise",
+              "amount": 3,
+              "amountType": "percent",
+              "limitEnabled": false,
+              "limitType": "today$",
+              "limit": 0
+            }
+          },
+          {
+            "id": "income-acme-pension",
+            "name": "Acme Pension",
+            "type": "pension",
+            "owner": "self",
+            "amount": 30000,
+            "amountType": "today$",
+            "frequency": "yearly",
+            "frequencyChoices": false,
+            "taxCharacter": "ordinary",
+            "taxExempt": false,
+            "withholdingMode": "auto",
+            "icon": "mdi-shield-account",
+            "planPath": "",
+            "start": { "type": "milestone", "value": "milestone-acme-your-retirement" },
+            "end": { "type": "milestone", "value": "milestone-acme-your-life" },
+            "yearlyChange": {
+              "type": "raise",
+              "amount": 2,
+              "amountType": "percent",
+              "limitEnabled": false,
+              "limitType": "today$",
+              "limit": 0
+            }
+          }
+        ]
+      },
+      "expenses": {
+        "events": [
+          {
+            "id": "expense-acme-essentials",
+            "name": "Essentials",
+            "type": "expense",
+            "owner": "joint",
+            "amount": 50000,
+            "amountType": "today$",
+            "frequency": "yearly",
+            "icon": "mdi-cart",
+            "planPath": "",
+            "start": { "type": "today", "value": "today" },
+            "end": { "type": "never", "value": "never" },
+            "yearlyChange": {
+              "type": "inflation",
+              "amount": 0,
+              "amountType": "percent",
+              "limitEnabled": false,
+              "limitType": "today$",
+              "limit": 0
+            }
+          },
+          {
+            "id": "expense-acme-discretionary",
+            "name": "Discretionary",
+            "type": "expense",
+            "owner": "joint",
+            "amount": 20000,
+            "amountType": "today$",
+            "frequency": "yearly",
+            "icon": "mdi-glass-cocktail",
+            "planPath": "",
+            "start": { "type": "today", "value": "today" },
+            "end": { "type": "never", "value": "never" },
+            "yearlyChange": {
+              "type": "inflation",
+              "amount": 0,
+              "amountType": "percent",
+              "limitEnabled": false,
+              "limitType": "today$",
+              "limit": 0
+            }
+          },
+          {
+            "id": "expense-acme-healthcare",
+            "name": "Healthcare",
+            "type": "expense",
+            "owner": "joint",
+            "amount": 12000,
+            "amountType": "today$",
+            "frequency": "yearly",
+            "icon": "mdi-medical-bag",
+            "planPath": "",
+            "start": { "type": "today", "value": "today" },
+            "end": { "type": "never", "value": "never" },
+            "yearlyChange": {
+              "type": "inflation",
+              "amount": 0,
+              "amountType": "percent",
+              "limitEnabled": false,
+              "limitType": "today$",
+              "limit": 0
+            }
+          }
+        ]
+      },
+      "accounts": { "events": [] },
+      "assets": { "events": [] },
+      "variables": {
+        "startYear": 2026,
+        "projectFrom": "today",
+        "inflationModifier": 0,
+        "incomeTaxNational": "auto",
+        "incomeTaxModifier": 0,
+        "capGains": "auto",
+        "capGainsModifier": 0,
+        "capGainsTaxablePercent": 100,
+        "localIncomeTaxRate": 0,
+        "estimateTaxes": true,
+        "assumptionsMode": "auto",
+        "cashFlowDefault": "savings",
+        "medicare": "auto"
+      },
+      "withdrawalStrategy": {
+        "type": "default",
+        "order": ["savings", "taxable", "ira", "roth-ira"]
+      },
+      "montecarlo": {
+        "enabled": false,
+        "iterations": 1000
+      },
+      "priorities": {
+        "items": []
+      },
+      "meta": {
+        "runKey": 1,
+        "index": 0,
+        "dirty": false,
+        "hasAddedPriorities": false,
+        "wizardStep": 7,
+        "yearlySummary": {}
+      }
     }
   ]
 }

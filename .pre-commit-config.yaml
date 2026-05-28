@@ -31,9 +31,26 @@ repos:
         types: [text]
         pass_filenames: false
 
-      - id: block-plan-json
-        name: Refuse to commit data/plan.json
-        entry: bash -c 'if git diff --cached --name-only | grep -E "^(data/plan\.json|api-key\.local)$" >/dev/null; then echo "BLOCKED: data/plan.json or api-key.local must never be committed (per spec §5 anti-list)"; exit 1; fi'
+      - id: block-sensitive-data
+        name: Refuse to commit real PL data files
+        entry: >-
+          bash -c 'staged=$(git diff --cached --name-only);
+          if echo "$staged" | grep -E "^(data/plan\.json|data/pl-export\.json|api-key\.local)$" >/dev/null;
+          then echo "BLOCKED — data/plan.json, data/pl-export.json, and api-key.local must never be committed.";
+          exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: deny-new-data-json
+        name: Deny new JSON files in data/ (allowlist plan.example.json only)
+        entry: >-
+          bash -c 'staged=$(git diff --cached --name-only --diff-filter=A);
+          bad=$(echo "$staged" | grep -E "^data/.*\.json$" | grep -vE "^data/plan\.example\.json$" || true);
+          if [ -n "$bad" ];
+          then echo "BLOCKED — new JSON files in data/ are not allowlisted (see .gitignore allowlist):";
+          echo "$bad";
+          exit 1; fi'
         language: system
         pass_filenames: false
         always_run: true

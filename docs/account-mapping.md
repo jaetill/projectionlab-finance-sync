@@ -1,28 +1,24 @@
-# Account mapping
+# Account identity
 
-`plan.json` identifies accounts by friendly name (e.g., `"Acme Brokerage Taxable"`). ProjectionLab identifies them by opaque ID (e.g., `"acc_abc123"`). The userscript resolves names to IDs in this order:
+ProjectionLab identifies every entity (account, milestone, income event, expense event, asset) by an opaque UUID assigned when the entity is first created in PL. The userscript treats those UUIDs as the source of truth.
 
-1. **Explicit `accountMap` override** — set via Tampermonkey storage (`GM_setValue('accountMap', { 'Acme Brokerage Taxable': 'acc_abc123' })`). Use this when fuzzy matching is ambiguous or wrong.
-2. **Exact name match** against `pl.getAccounts()`.
-3. **Case-insensitive name match.**
-4. **Substring match** — if `plan.json` says `"Acme Brokerage Taxable"` and PL has `"Acme Brokerage (Taxable, Joint)"`, the substring match wins as a fallback.
-5. **Unresolved.** Reported in the status panel; the sync continues with the resolvable accounts and skips the unresolved one.
+## How it works
 
-## Recommended workflow
+1. **First-time bootstrap.** Open `pl-export.json` (produced by `pl.exportData()`) and copy the entity UUIDs you care about into your private financial memo. Generate `plan.json` once per memo update; the UUIDs flow through unchanged.
+2. **Every subsequent sync.** `plan.json` carries the same UUIDs the userscript pushed last time. `restoreCurrentFinances` and `restorePlans` replace the matching entities by id.
+3. **Adding a new entity.** Give it a new UUID (any unique string PL hasn't seen before — `crypto.randomUUID()` or just `acct-<descriptive-slug>-<n>`). PL creates it.
+4. **Removing an entity.** Leave it out of `plan.json`. The wholesale restore drops anything not in the payload.
 
-- First sync against a fresh PL workspace: let the userscript create accounts using the names from `plan.json`. The resulting IDs become canonical.
-- Subsequent syncs hit step 2 (exact match) for free.
-- If you rename an account in PL, add an `accountMap` entry to keep the link.
+## What we explicitly do NOT do
 
-## Storing an `accountMap`
+- **No name-based resolution.** Earlier scaffolds tried exact/fuzzy/substring matching on account names. That was for a fictional API surface (`getAccounts` / `setAccount`) that doesn't exist. The real API is UUID-native end to end.
+- **No `accountMap` storage.** Nothing to override — there's no name → id map to maintain.
+- **No partial updates.** `updateAccount` exists on the API but we don't call it. The architecture is "validate → snapshot → wholesale restore", documented in [`pl-api-cheatsheet.md`](pl-api-cheatsheet.md).
 
-In Tampermonkey, open the userscript dashboard → **Storage** tab → add a JSON value under `accountMap`:
+## What this means for renaming
 
-```json
-{
-  "Acme Brokerage Taxable": "acc_abc123",
-  "Acme 401k": "acc_def456"
-}
-```
+Rename an account in PL → its UUID is unchanged → next sync still finds it. The user-visible name in PL comes from `plan.json`, so the next sync may overwrite a manually-renamed account back to whatever the memo says. That's intentional: `plan.json` is the source of truth.
 
-(There's no UI helper for editing `accountMap` from inside the page yet; future enhancement if it becomes a real friction point.)
+## What this means for moving between plans
+
+`restorePlans` takes a `Plan[]`. Every plan keeps its own milestones / income events / expense events with their own UUIDs. To move an entity from one plan to another, change which `plan.plans[*]` it lives in — its UUID stays the same.

@@ -8,9 +8,21 @@ dist/
 # Testing / coverage
 coverage/
 .vitest-cache/
+vitest.config.js.timestamp-*.mjs
 
-# CRITICAL — financial data, never commit
+# CRITICAL — defensive allowlist for data/
+# Everything in data/ is denied by default; only the schema reference is allowed.
+# This is intentional: a new .json that lands in data/ — for any reason —
+# is invisible to git until explicitly allowlisted here.
+data/*.json
+!data/plan.example.json
+
+# Explicit re-denial of known-sensitive filenames (belt + suspenders, in case
+# the allowlist above ever gets weakened).
 data/plan.json
+data/pl-export.json
+
+# API key + local-only files
 api-key.local
 *.local
 
@@ -42,3 +54,4 @@ site/
 .claude/audit.log
 .claude/sessions/
 .claude/last-test-result
+.claude/worktrees/

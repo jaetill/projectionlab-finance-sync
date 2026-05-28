@@ -1,11 +1,11 @@
-// Configuration helpers — read/write secrets and runtime state in Tampermonkey storage.
-// All values live in GM_* storage; nothing here ever touches the network or the page DOM.
+// Storage helpers — read/write secrets and runtime state in Tampermonkey storage.
+// Nothing here touches the network or the page DOM. All values live in GM_*.
 
 const KEYS = Object.freeze({
   apiKey: 'apiKey',
   plan: 'plan',
-  accountMap: 'accountMap',
   lastSyncAt: 'lastSyncAt',
+  rollbackSnapshot: 'rollbackSnapshot',
 });
 
 function trim(value) {
@@ -20,9 +20,7 @@ export function getApiKey() {
 
 export function setApiKey(key) {
   const value = trim(key);
-  if (!value) {
-    throw new Error('API key cannot be empty');
-  }
+  if (!value) throw new Error('API key cannot be empty');
   GM_setValue(KEYS.apiKey, value);
 }
 
@@ -51,17 +49,8 @@ export function setPlanRaw(jsonString) {
   return parsed;
 }
 
-export function getAccountMap() {
-  const raw = GM_getValue(KEYS.accountMap, null);
-  if (!raw || typeof raw !== 'object') return {};
-  return raw;
-}
-
-export function setAccountMap(map) {
-  if (!map || typeof map !== 'object') {
-    throw new Error('accountMap must be an object');
-  }
-  GM_setValue(KEYS.accountMap, map);
+export function clearPlan() {
+  GM_setValue(KEYS.plan, null);
 }
 
 export function getLastSyncAt() {
@@ -71,6 +60,24 @@ export function getLastSyncAt() {
 export function recordSync(timestamp = new Date().toISOString()) {
   GM_setValue(KEYS.lastSyncAt, timestamp);
   return timestamp;
+}
+
+// Rollback baseline: full pl.exportData() output captured immediately before
+// every sync. Lets the user revert via "Rollback to last snapshot" if they
+// don't like the sync's effect on PL.
+export function getRollbackSnapshot() {
+  return GM_getValue(KEYS.rollbackSnapshot, null);
+}
+
+export function setRollbackSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') {
+    throw new Error('rollback snapshot must be an object');
+  }
+  GM_setValue(KEYS.rollbackSnapshot, snapshot);
+}
+
+export function clearRollbackSnapshot() {
+  GM_setValue(KEYS.rollbackSnapshot, null);
 }
 
 export const STORAGE_KEYS = KEYS;

@@ -25,18 +25,53 @@ globalThis.GM_info = { script: { version: '0.0.0-test' } };
 // happy-dom provides window/document; expose unsafeWindow as an alias for tests.
 globalThis.unsafeWindow = globalThis.window;
 
+// Mirrors the 7 real PL Plugin API methods (per docs/pl-api-cheatsheet.md).
 export function makePluginApiStub(overrides = {}) {
   return {
-    getAccounts: vi.fn(async () => []),
-    setAccount: vi.fn(async (account) => account),
-    deleteAccount: vi.fn(async () => true),
-    getMilestones: vi.fn(async () => []),
-    setMilestone: vi.fn(async (milestone) => milestone),
-    getIncomes: vi.fn(async () => []),
-    setIncome: vi.fn(async (income) => income),
-    getExpenses: vi.fn(async () => []),
-    setExpense: vi.fn(async (expense) => expense),
+    validateApiKey: vi.fn(async () => undefined),
+    exportData: vi.fn(async () => ({
+      meta: { version: '4.6.0', lastUpdated: 0 },
+      today: { savingsAccounts: [], investmentAccounts: [], debts: [], assets: [] },
+      plans: [],
+      progress: {},
+      settings: {},
+    })),
+    updateAccount: vi.fn(async () => undefined),
+    restoreCurrentFinances: vi.fn(async () => undefined),
+    restorePlans: vi.fn(async () => undefined),
+    restoreProgress: vi.fn(async () => undefined),
+    restoreSettings: vi.fn(async () => undefined),
     ...overrides,
+  };
+}
+
+// A minimal-but-valid plan that passes the structural validator. Tests can
+// shallow-merge overrides on top.
+export function makeValidPlan(overrides = {}) {
+  return {
+    today: {
+      schema: 4.6,
+      partnerStatus: 'single',
+      age: 50,
+      birthYear: 1976,
+      birthMonth: 1,
+      savingsAccounts: [{ id: 'a1', name: 'HYSA', type: 'savings', balance: 50000 }],
+      investmentAccounts: [{ id: 'b1', name: 'IRA', type: 'ira', balance: 250000 }],
+      debts: [],
+      assets: [],
+      ...overrides.today,
+    },
+    plans: overrides.plans || [
+      {
+        id: 'plan-1',
+        name: 'Current',
+        milestones: [
+          { id: 'm1', name: 'Retirement', criteria: [{ type: 'year', value: '2040-01-01' }] },
+        ],
+        income: { events: [] },
+        expenses: { events: [] },
+      },
+    ],
   };
 }
 

@@ -1,136 +1,136 @@
-// Core sync logic. Idempotent: reads existing PL state, diffs against plan.json,
-// pushes only what differs. Returns a SyncResult that the UI renders.
+// Orchestrates a ProjectionLab sync. Architecture (per docs/pl-api-cheatsheet.md):
+//
+//   1. validateApiKey      — fast-fail if the key is wrong
+//   2. exportData          — captured as the rollback baseline BEFORE we mutate PL
+//   3. restoreCurrentFinances(plan.today)
+//   4. restorePlans(plan.plans)
+//
+// We deliberately do NOT call restoreProgress or restoreSettings (user-owned).
+//
+// The result is structured so the UI can show a status panel and the user can
+// roll back via the rollbackTo() function if PL ends up in an unexpected state.
 
-import { resolvePlanAccounts } from './account-mapping.js';
 import { validatePlan } from './plan-validator.js';
 
 export function emptyResult() {
   return {
     ok: true,
-    counts: { accounts: 0, milestones: 0, income: 0, expenses: 0 },
+    steps: [],
+    rollbackSnapshot: null,
     errors: [],
-    unresolved: [],
-    skipped: { accounts: 0, milestones: 0, income: 0, expenses: 0 },
+    warnings: [],
     startedAt: null,
     finishedAt: null,
   };
 }
 
-function recordError(result, scope, error) {
-  result.ok = false;
-  result.errors.push({ scope, message: error?.message ?? String(error) });
-}
-
-function accountsEqual(planAccount, plAccount) {
-  if (!plAccount) return false;
-  return (
-    plAccount.name === planAccount.name &&
-    plAccount.type === planAccount.type &&
-    plAccount.balance === planAccount.balance &&
-    plAccount.currency === planAccount.currency
-  );
-}
-
-function findByLabel(list, label) {
-  return Array.isArray(list) ? list.find((item) => item?.label === label) : undefined;
-}
-
-async function syncAccounts(plan, pl, accountMap, result) {
-  let existing = [];
+async function runStep(name, fn, result) {
+  const startedAt = Date.now();
   try {
-    existing = await pl.getAccounts();
+    const value = await fn();
+    result.steps.push({ name, ok: true, durationMs: Date.now() - startedAt });
+    return { ok: true, value };
   } catch (err) {
-    recordError(result, 'getAccounts', err);
-    return;
-  }
-  const { resolved, unresolved } = resolvePlanAccounts(plan, accountMap, existing);
-  result.unresolved.push(...unresolved.map((a) => ({ kind: 'account', name: a.name })));
-
-  for (const { planAccount, id } of resolved) {
-    const current = existing.find((a) => a.id === id);
-    if (accountsEqual(planAccount, current)) {
-      result.skipped.accounts += 1;
-      continue;
-    }
-    try {
-      await pl.setAccount({ id, ...planAccount });
-      result.counts.accounts += 1;
-    } catch (err) {
-      recordError(result, `setAccount(${planAccount.name})`, err);
-    }
+    const message = err?.message ?? String(err);
+    result.steps.push({ name, ok: false, durationMs: Date.now() - startedAt, error: message });
+    result.errors.push({ scope: name, message });
+    result.ok = false;
+    return { ok: false, error: err };
   }
 }
 
-async function syncLabeled(planList, plListMethod, plSetMethod, scope, pl, result, comparator) {
-  if (!Array.isArray(planList) || planList.length === 0) return;
-  let existing = [];
-  try {
-    existing = await plListMethod();
-  } catch (err) {
-    recordError(result, `${scope}.list`, err);
-    return;
-  }
-  for (const item of planList) {
-    const current = findByLabel(existing, item.label);
-    if (current && comparator(item, current)) {
-      result.skipped[scope] += 1;
-      continue;
-    }
-    try {
-      await plSetMethod(current?.id ? { id: current.id, ...item } : { ...item });
-      result.counts[scope] += 1;
-    } catch (err) {
-      recordError(result, `${scope}.set(${item.label})`, err);
-    }
-  }
-}
-
-const incomeEqual = (a, b) =>
-  a.amount === b.amount && a.frequency === b.frequency && a.startDate === b.startDate;
-const expenseEqual = (a, b) =>
-  a.amount === b.amount && a.frequency === b.frequency && a.category === b.category;
-const milestoneEqual = (a, b) => a.date === b.date && a.kind === b.kind;
-
-export async function syncPlan(plan, pl, accountMap = {}, now = () => new Date().toISOString()) {
+export async function syncPlan(plan, pl, apiKey, now = () => Date.now()) {
   const result = emptyResult();
   result.startedAt = now();
 
+  // 0. Structural validation — never touches PL.
   const validation = validatePlan(plan);
   if (!validation.valid) {
     result.ok = false;
-    result.errors.push({ scope: 'validation', message: validation.errors.join('; ') });
+    result.errors.push({ scope: 'validate-plan', message: validation.errors.join('; ') });
+    result.finishedAt = now();
+    return result;
+  }
+  if (validation.warnings?.length) {
+    result.warnings.push(...validation.warnings);
+  }
+
+  if (!apiKey) {
+    result.ok = false;
+    result.errors.push({ scope: 'validate-plan', message: 'apiKey is required' });
     result.finishedAt = now();
     return result;
   }
 
-  await syncAccounts(plan, pl, accountMap, result);
-  await syncLabeled(
-    plan.income,
-    () => pl.getIncomes(),
-    (x) => pl.setIncome(x),
-    'income',
-    pl,
+  const options = { key: apiKey };
+
+  // 1. validateApiKey
+  const step1 = await runStep('validate-api-key', () => pl.validateApiKey(options), result);
+  if (!step1.ok) {
+    result.finishedAt = now();
+    return result;
+  }
+
+  // 2. exportData — snapshot the current state for rollback.
+  const step2 = await runStep('export-data', () => pl.exportData(options), result);
+  if (!step2.ok) {
+    result.finishedAt = now();
+    return result;
+  }
+  result.rollbackSnapshot = step2.value;
+
+  // 3. restoreCurrentFinances
+  await runStep(
+    'restore-current-finances',
+    () => pl.restoreCurrentFinances(plan.today, options),
     result,
-    incomeEqual,
   );
-  await syncLabeled(
-    plan.expenses,
-    () => pl.getExpenses(),
-    (x) => pl.setExpense(x),
-    'expenses',
-    pl,
-    result,
-    expenseEqual,
-  );
-  await syncLabeled(
-    plan.milestones,
-    () => pl.getMilestones(),
-    (x) => pl.setMilestone(x),
-    'milestones',
-    pl,
-    result,
-    milestoneEqual,
-  );
+
+  // 4. restorePlans — even if step 3 failed, we still attempt 4 so the user
+  // gets a complete picture of what worked and what didn't. They can always
+  // roll back from the snapshot.
+  await runStep('restore-plans', () => pl.restorePlans(plan.plans, options), result);
+
+  result.finishedAt = now();
+  return result;
+}
+
+// Push a previously-captured snapshot back to PL — reverses a sync.
+// Used by the "Rollback to last snapshot" menu command.
+export async function rollbackTo(snapshot, pl, apiKey, now = () => Date.now()) {
+  const result = emptyResult();
+  result.startedAt = now();
+
+  if (!snapshot || typeof snapshot !== 'object') {
+    result.ok = false;
+    result.errors.push({ scope: 'rollback', message: 'snapshot is missing or invalid' });
+    result.finishedAt = now();
+    return result;
+  }
+  if (!apiKey) {
+    result.ok = false;
+    result.errors.push({ scope: 'rollback', message: 'apiKey is required' });
+    result.finishedAt = now();
+    return result;
+  }
+
+  const options = { key: apiKey };
+  await runStep('validate-api-key', () => pl.validateApiKey(options), result);
+  if (!result.ok) {
+    result.finishedAt = now();
+    return result;
+  }
+
+  if (snapshot.today !== undefined) {
+    await runStep(
+      'restore-current-finances',
+      () => pl.restoreCurrentFinances(snapshot.today, options),
+      result,
+    );
+  }
+  if (Array.isArray(snapshot.plans)) {
+    await runStep('restore-plans', () => pl.restorePlans(snapshot.plans, options), result);
+  }
 
   result.finishedAt = now();
   return result;

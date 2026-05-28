@@ -1,70 +1,161 @@
 import { describe, expect, it } from 'vitest';
-import { resolveAccountId, resolvePlanAccounts } from '../../userscript/src/account-mapping.js';
+import {
+  countPlanEntities,
+  findById,
+  groupByType,
+  summarizeToday,
+} from '../../userscript/src/account-mapping.js';
+import { makeValidPlan } from '../setup.js';
 
-const plAccounts = [
-  { id: 'acc_taxable', name: 'Acme Brokerage Taxable' },
-  { id: 'acc_401k', name: 'Acme 401(k)' },
-  { id: 'acc_hysa', name: 'Acme HYSA' },
-];
+const sampleToday = {
+  savingsAccounts: [
+    { id: 'a1', name: 'HYSA', type: 'savings', balance: 50000 },
+    { id: 'a2', name: 'Checking', type: 'checking', balance: 5000 },
+  ],
+  investmentAccounts: [
+    { id: 'b1', name: 'IRA', type: 'ira', balance: 250000 },
+    { id: 'b2', name: 'Roth IRA', type: 'roth-ira', balance: 150000 },
+    { id: 'b3', name: 'Taxable', type: 'taxable', balance: 100000 },
+  ],
+  debts: [{ id: 'd1', name: 'Mortgage', type: 'mortgage', balance: 200000 }],
+  assets: [{ id: 'h1', name: 'Home', type: 'home', balance: 400000 }],
+};
 
-describe('resolveAccountId', () => {
-  it('returns null when name is empty', () => {
-    expect(resolveAccountId('', {}, plAccounts)).toBeNull();
-    expect(resolveAccountId(null, {}, plAccounts)).toBeNull();
+describe('summarizeToday', () => {
+  it('counts each account type bucket', () => {
+    const s = summarizeToday(sampleToday);
+    expect(s.savingsCount).toBe(2);
+    expect(s.investmentCount).toBe(3);
+    expect(s.debtCount).toBe(1);
+    expect(s.assetCount).toBe(1);
+    expect(s.accountCount).toBe(5); // savings + investments
   });
 
-  it('honors an explicit accountMap override', () => {
-    expect(
-      resolveAccountId('Anything Goes Here', { 'Anything Goes Here': 'acc_special' }, plAccounts),
-    ).toBe('acc_special');
+  it('sums balances correctly', () => {
+    const s = summarizeToday(sampleToday);
+    expect(s.totalCash).toBe(55000);
+    expect(s.totalInvested).toBe(500000);
+    expect(s.totalDebt).toBe(200000);
+    expect(s.totalAssetValue).toBe(400000);
+    expect(s.netWorth).toBe(55000 + 500000 + 400000 - 200000); // 755000
   });
 
-  it('treats an empty-string accountMap value as null (explicit deny)', () => {
-    expect(
-      resolveAccountId('Acme Brokerage Taxable', { 'Acme Brokerage Taxable': '' }, plAccounts),
-    ).toBeNull();
+  it('handles missing/null input gracefully', () => {
+    const empty = summarizeToday(null);
+    expect(empty.accountCount).toBe(0);
+    expect(empty.netWorth).toBe(0);
   });
 
-  it('matches by exact name', () => {
-    expect(resolveAccountId('Acme Brokerage Taxable', {}, plAccounts)).toBe('acc_taxable');
+  it('treats missing buckets as empty arrays', () => {
+    const partial = summarizeToday({
+      savingsAccounts: [{ id: 'a', name: 'A', type: 'savings', balance: 1 }],
+    });
+    expect(partial.totalCash).toBe(1);
+    expect(partial.totalInvested).toBe(0);
+    expect(partial.debtCount).toBe(0);
   });
 
-  it('matches case-insensitively', () => {
-    expect(resolveAccountId('acme brokerage taxable', {}, plAccounts)).toBe('acc_taxable');
-  });
-
-  it('falls back to substring match (plan-name contains PL-name)', () => {
-    expect(resolveAccountId('Acme 401(k) Retirement', {}, plAccounts)).toBe('acc_401k');
-  });
-
-  it('falls back to substring match (PL-name contains plan-name)', () => {
-    expect(resolveAccountId('HYSA', {}, plAccounts)).toBe('acc_hysa');
-  });
-
-  it('returns null when nothing matches', () => {
-    expect(resolveAccountId('Vanguard IRA', {}, plAccounts)).toBeNull();
-  });
-
-  it('returns null when plAccounts is missing', () => {
-    expect(resolveAccountId('Whatever', {}, undefined)).toBeNull();
+  it('treats non-numeric balances as zero', () => {
+    const s = summarizeToday({
+      savingsAccounts: [{ id: 'a', name: 'A', type: 'savings', balance: 'oops' }],
+      investmentAccounts: [],
+      debts: [],
+      assets: [],
+    });
+    expect(s.totalCash).toBe(0);
   });
 });
 
-describe('resolvePlanAccounts', () => {
-  it('partitions plan accounts into resolved and unresolved', () => {
-    const plan = {
-      accounts: [
-        { name: 'Acme Brokerage Taxable', type: 'TAXABLE_BROKERAGE', balance: 100 },
-        { name: 'Unknown Account', type: 'CHECKING', balance: 50 },
-        { name: 'Acme HYSA', type: 'SAVINGS', balance: 200 },
-      ],
-    };
-    const { resolved, unresolved } = resolvePlanAccounts(plan, {}, plAccounts);
-    expect(resolved.map((r) => r.id)).toEqual(['acc_taxable', 'acc_hysa']);
-    expect(unresolved.map((u) => u.name)).toEqual(['Unknown Account']);
+describe('groupByType', () => {
+  it('groups accounts by their type', () => {
+    const g = groupByType(sampleToday.investmentAccounts);
+    expect(Object.keys(g).sort()).toEqual(['ira', 'roth-ira', 'taxable']);
+    expect(g.ira).toHaveLength(1);
+    expect(g.taxable).toHaveLength(1);
   });
 
-  it('handles an empty plan gracefully', () => {
-    expect(resolvePlanAccounts({}, {}, plAccounts)).toEqual({ resolved: [], unresolved: [] });
+  it('buckets missing types under "unknown"', () => {
+    const g = groupByType([{ id: 'x', name: 'X', balance: 0 }]);
+    expect(g.unknown).toHaveLength(1);
+  });
+
+  it('handles null input', () => {
+    expect(groupByType(null)).toEqual({});
+  });
+});
+
+describe('findById', () => {
+  it('finds an account in savings', () => {
+    expect(findById(sampleToday, 'a1')).toEqual({
+      bucket: 'savingsAccounts',
+      item: sampleToday.savingsAccounts[0],
+    });
+  });
+
+  it('finds an account in investments', () => {
+    expect(findById(sampleToday, 'b2')).toEqual({
+      bucket: 'investmentAccounts',
+      item: sampleToday.investmentAccounts[1],
+    });
+  });
+
+  it('finds debts and assets', () => {
+    expect(findById(sampleToday, 'd1').bucket).toBe('debts');
+    expect(findById(sampleToday, 'h1').bucket).toBe('assets');
+  });
+
+  it('returns null for unknown id', () => {
+    expect(findById(sampleToday, 'nope')).toBeNull();
+  });
+
+  it('returns null for falsy id', () => {
+    expect(findById(sampleToday, '')).toBeNull();
+    expect(findById(sampleToday, null)).toBeNull();
+  });
+});
+
+describe('countPlanEntities', () => {
+  it('counts entities across all plans', () => {
+    const plan = makeValidPlan();
+    plan.plans[0].income.events = [
+      { id: 'i1', name: 'salary' },
+      { id: 'i2', name: 'pension' },
+    ];
+    plan.plans[0].expenses.events = [{ id: 'e1', name: 'rent' }];
+    const c = countPlanEntities(plan);
+    expect(c.planCount).toBe(1);
+    expect(c.milestones).toBe(1); // from makeValidPlan default
+    expect(c.income).toBe(2);
+    expect(c.expenses).toBe(1);
+  });
+
+  it('sums across multiple plans', () => {
+    const plan = makeValidPlan({
+      plans: [
+        { id: 'p1', name: 'A', milestones: [{ id: 'm', name: 'M' }] },
+        {
+          id: 'p2',
+          name: 'B',
+          milestones: [
+            { id: 'm2', name: 'M2' },
+            { id: 'm3', name: 'M3' },
+          ],
+        },
+      ],
+    });
+    const c = countPlanEntities(plan);
+    expect(c.planCount).toBe(2);
+    expect(c.milestones).toBe(3);
+  });
+
+  it('returns zeros for an empty plan', () => {
+    expect(countPlanEntities({ plans: [] })).toEqual({
+      planCount: 0,
+      milestones: 0,
+      income: 0,
+      expenses: 0,
+      accountEvents: 0,
+      assetEvents: 0,
+    });
   });
 });

@@ -1,113 +1,168 @@
-// Lightweight validator for plan.json. Returns { valid, errors } — never throws,
-// because callers (UI + sync) need to surface specific errors to the user.
+// Structural validator for plan.json. Returns { valid, errors } — never throws.
+//
+// Contract: plan.json mirrors the shape that ProjectionLab's exportData() returns
+// (minus user-owned `progress`/`settings`/`meta`), i.e. roughly:
+//
+//   {
+//     _meta?: { ... our metadata, ignored by PL ... },
+//     today: { savingsAccounts, investmentAccounts, debts, assets, ... },
+//     plans: [ { id, name, milestones, income:{events}, expenses:{events}, accounts:{events}, ... } ]
+//   }
+//
+// The userscript hands `today` to pl.restoreCurrentFinances() and `plans` to
+// pl.restorePlans() wholesale. PL does its own field-level validation; we only
+// catch structural errors here so the user sees them BEFORE we push to PL.
 
-export const CURRENT_SCHEMA_VERSION = 1;
-export const ACCOUNT_TYPES = new Set([
-  'TAXABLE_BROKERAGE',
-  'TRADITIONAL_IRA',
-  'ROTH_IRA',
-  'TRADITIONAL_401K',
-  'ROTH_401K',
-  'CHECKING',
-  'SAVINGS',
-  'HSA',
-  'CRYPTO',
-  'REAL_ESTATE',
-  'OTHER',
+export const CURRENT_SCHEMA_VERSION = 2;
+
+// Investment / savings account types observed in PL exports. Lenient — we
+// surface unknown types as warnings, not errors, so PL ultimately decides.
+export const KNOWN_ACCOUNT_TYPES = new Set([
+  'ira',
+  'roth-ira',
+  'taxable',
+  'savings',
+  'checking',
+  '401k',
+  'roth-401k',
+  '403b',
+  'hsa',
+  'sep-ira',
+  'simple-ira',
+  'crypto',
+  'cd',
+  'money-market',
+  'brokerage',
 ]);
-export const FREQUENCIES = new Set(['ANNUAL', 'MONTHLY', 'WEEKLY', 'ONE_TIME']);
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-function isFiniteNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value);
-}
+export const KNOWN_MILESTONE_CRITERIA_TYPES = new Set([
+  'year',
+  'age',
+  'spending',
+  'net_worth',
+  'savings',
+  'income',
+  'asset',
+]);
 
 function pushIf(errors, condition, message) {
   if (!condition) errors.push(message);
 }
 
-function validateAccount(account, index, errors) {
-  const prefix = `accounts[${index}]`;
-  pushIf(
-    errors,
-    typeof account?.name === 'string' && account.name.length > 0,
-    `${prefix}.name is required`,
-  );
-  pushIf(
-    errors,
-    ACCOUNT_TYPES.has(account?.type),
-    `${prefix}.type must be one of ${[...ACCOUNT_TYPES].join(', ')}`,
-  );
-  pushIf(errors, isFiniteNumber(account?.balance), `${prefix}.balance must be a finite number`);
-  pushIf(
-    errors,
-    typeof account?.currency === 'string' && account.currency.length === 3,
-    `${prefix}.currency must be a 3-letter code`,
-  );
+function isObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
-function validateIncome(item, index, errors) {
-  const prefix = `income[${index}]`;
-  pushIf(errors, typeof item?.label === 'string', `${prefix}.label is required`);
-  pushIf(errors, isFiniteNumber(item?.amount), `${prefix}.amount must be a finite number`);
-  pushIf(
-    errors,
-    FREQUENCIES.has(item?.frequency),
-    `${prefix}.frequency must be one of ${[...FREQUENCIES].join(', ')}`,
-  );
-  if (item?.startDate !== undefined && item.startDate !== null) {
-    pushIf(errors, ISO_DATE.test(item.startDate), `${prefix}.startDate must be YYYY-MM-DD`);
+function isNonEmptyString(v) {
+  return typeof v === 'string' && v.length > 0;
+}
+
+function validateAccountList(list, listName, errors, warnings) {
+  if (!Array.isArray(list)) {
+    errors.push(`today.${listName} must be an array`);
+    return;
+  }
+  list.forEach((acct, i) => {
+    const prefix = `today.${listName}[${i}]`;
+    pushIf(errors, isObject(acct), `${prefix} must be an object`);
+    if (!isObject(acct)) return;
+    pushIf(errors, isNonEmptyString(acct.id), `${prefix}.id must be a non-empty string`);
+    pushIf(errors, isNonEmptyString(acct.name), `${prefix}.name must be a non-empty string`);
+    pushIf(errors, isNonEmptyString(acct.type), `${prefix}.type must be a non-empty string`);
+    pushIf(
+      errors,
+      typeof acct.balance === 'number' && Number.isFinite(acct.balance),
+      `${prefix}.balance must be a finite number`,
+    );
+    if (isNonEmptyString(acct.type) && !KNOWN_ACCOUNT_TYPES.has(acct.type)) {
+      warnings.push(
+        `${prefix}.type='${acct.type}' is not in KNOWN_ACCOUNT_TYPES — PL may reject it`,
+      );
+    }
+  });
+}
+
+function validateMilestone(m, planIdx, milestoneIdx, errors, warnings) {
+  const prefix = `plans[${planIdx}].milestones[${milestoneIdx}]`;
+  pushIf(errors, isObject(m), `${prefix} must be an object`);
+  if (!isObject(m)) return;
+  pushIf(errors, isNonEmptyString(m.id), `${prefix}.id must be a non-empty string`);
+  pushIf(errors, isNonEmptyString(m.name), `${prefix}.name must be a non-empty string`);
+  if (m.criteria !== undefined) {
+    pushIf(errors, Array.isArray(m.criteria), `${prefix}.criteria must be an array`);
+    if (Array.isArray(m.criteria)) {
+      m.criteria.forEach((c, ci) => {
+        const cp = `${prefix}.criteria[${ci}]`;
+        pushIf(errors, isObject(c), `${cp} must be an object`);
+        if (!isObject(c)) return;
+        pushIf(errors, isNonEmptyString(c.type), `${cp}.type must be a non-empty string`);
+        if (isNonEmptyString(c.type) && !KNOWN_MILESTONE_CRITERIA_TYPES.has(c.type)) {
+          warnings.push(`${cp}.type='${c.type}' is not in KNOWN_MILESTONE_CRITERIA_TYPES`);
+        }
+      });
+    }
   }
 }
 
-function validateExpense(item, index, errors) {
-  const prefix = `expenses[${index}]`;
-  pushIf(errors, typeof item?.label === 'string', `${prefix}.label is required`);
-  pushIf(errors, isFiniteNumber(item?.amount), `${prefix}.amount must be a finite number`);
-  pushIf(
-    errors,
-    FREQUENCIES.has(item?.frequency),
-    `${prefix}.frequency must be one of ${[...FREQUENCIES].join(', ')}`,
-  );
+function validateEventBag(bag, label, planIdx, errors) {
+  // PL groups income/expenses/accounts/assets as { events: [...] } inside a plan.
+  if (bag === undefined) return; // Optional — empty plan is allowed.
+  const prefix = `plans[${planIdx}].${label}`;
+  pushIf(errors, isObject(bag), `${prefix} must be an object with an events array`);
+  if (!isObject(bag)) return;
+  pushIf(errors, Array.isArray(bag.events), `${prefix}.events must be an array`);
+  if (Array.isArray(bag.events)) {
+    bag.events.forEach((ev, ei) => {
+      const ep = `${prefix}.events[${ei}]`;
+      pushIf(errors, isObject(ev), `${ep} must be an object`);
+      if (!isObject(ev)) return;
+      pushIf(errors, isNonEmptyString(ev.id), `${ep}.id must be a non-empty string`);
+      pushIf(errors, isNonEmptyString(ev.name), `${ep}.name must be a non-empty string`);
+    });
+  }
 }
 
-function validateMilestone(item, index, errors) {
-  const prefix = `milestones[${index}]`;
-  pushIf(errors, typeof item?.label === 'string', `${prefix}.label is required`);
-  pushIf(
-    errors,
-    typeof item?.date === 'string' && ISO_DATE.test(item.date),
-    `${prefix}.date must be YYYY-MM-DD`,
-  );
+function validatePlan_one(plan, idx, errors, warnings) {
+  const prefix = `plans[${idx}]`;
+  pushIf(errors, isObject(plan), `${prefix} must be an object`);
+  if (!isObject(plan)) return;
+  pushIf(errors, isNonEmptyString(plan.id), `${prefix}.id must be a non-empty string`);
+  pushIf(errors, isNonEmptyString(plan.name), `${prefix}.name must be a non-empty string`);
+  if (plan.milestones !== undefined) {
+    pushIf(errors, Array.isArray(plan.milestones), `${prefix}.milestones must be an array`);
+    if (Array.isArray(plan.milestones)) {
+      plan.milestones.forEach((m, mi) => validateMilestone(m, idx, mi, errors, warnings));
+    }
+  }
+  validateEventBag(plan.income, 'income', idx, errors);
+  validateEventBag(plan.expenses, 'expenses', idx, errors);
+  validateEventBag(plan.accounts, 'accounts', idx, errors);
+  validateEventBag(plan.assets, 'assets', idx, errors);
 }
 
 export function validatePlan(plan) {
   const errors = [];
-  if (!plan || typeof plan !== 'object') {
-    return { valid: false, errors: ['plan must be a JSON object'] };
+  const warnings = [];
+
+  if (!isObject(plan)) {
+    return { valid: false, errors: ['plan must be a JSON object'], warnings };
   }
-  pushIf(
-    errors,
-    plan.schemaVersion === CURRENT_SCHEMA_VERSION,
-    `schemaVersion must be ${CURRENT_SCHEMA_VERSION}`,
-  );
-  pushIf(
-    errors,
-    typeof plan.asOfDate === 'string' && ISO_DATE.test(plan.asOfDate),
-    'asOfDate must be YYYY-MM-DD',
-  );
-  pushIf(
-    errors,
-    Array.isArray(plan.accounts) && plan.accounts.length > 0,
-    'accounts must be a non-empty array',
-  );
 
-  if (Array.isArray(plan.accounts)) plan.accounts.forEach((a, i) => validateAccount(a, i, errors));
-  if (Array.isArray(plan.income)) plan.income.forEach((a, i) => validateIncome(a, i, errors));
-  if (Array.isArray(plan.expenses)) plan.expenses.forEach((a, i) => validateExpense(a, i, errors));
-  if (Array.isArray(plan.milestones))
-    plan.milestones.forEach((a, i) => validateMilestone(a, i, errors));
+  // top-level
+  if (!isObject(plan.today)) {
+    errors.push('top-level "today" must be an object');
+  } else {
+    validateAccountList(plan.today.savingsAccounts, 'savingsAccounts', errors, warnings);
+    validateAccountList(plan.today.investmentAccounts, 'investmentAccounts', errors, warnings);
+    if (!Array.isArray(plan.today.debts)) errors.push('today.debts must be an array');
+    if (!Array.isArray(plan.today.assets)) errors.push('today.assets must be an array');
+  }
 
-  return { valid: errors.length === 0, errors };
+  if (!Array.isArray(plan.plans) || plan.plans.length === 0) {
+    errors.push('top-level "plans" must be a non-empty array');
+  } else {
+    plan.plans.forEach((p, i) => validatePlan_one(p, i, errors, warnings));
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
 }

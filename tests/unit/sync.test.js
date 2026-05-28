@@ -1,185 +1,154 @@
 import { describe, expect, it, vi } from 'vitest';
-import { makePluginApiStub } from '../setup.js';
-import { syncPlan } from '../../userscript/src/sync.js';
-
-const validPlan = {
-  schemaVersion: 1,
-  generatedAt: '2026-05-11T00:00:00Z',
-  asOfDate: '2026-05-11',
-  accounts: [
-    {
-      name: 'Acme Brokerage Taxable',
-      type: 'TAXABLE_BROKERAGE',
-      balance: 100000,
-      currency: 'USD',
-      owner: 'self',
-    },
-    {
-      name: 'Acme 401k',
-      type: 'TRADITIONAL_401K',
-      balance: 200000,
-      currency: 'USD',
-      owner: 'self',
-    },
-  ],
-  income: [
-    {
-      label: 'Day job salary',
-      amount: 100000,
-      frequency: 'ANNUAL',
-      startDate: '2026-01-01',
-      endDate: null,
-      growthRate: 0.03,
-    },
-  ],
-  expenses: [
-    { label: 'Living expenses', amount: 60000, frequency: 'ANNUAL', category: 'ESSENTIAL' },
-  ],
-  milestones: [{ label: 'Retirement', date: '2040-01-01', kind: 'RETIREMENT' }],
-};
+import { makePluginApiStub, makeValidPlan } from '../setup.js';
+import { rollbackTo, syncPlan } from '../../userscript/src/sync.js';
 
 describe('syncPlan', () => {
-  it('refuses to sync an invalid plan and reports validation errors', async () => {
+  it('refuses to sync an invalid plan and never touches PL', async () => {
     const pl = makePluginApiStub();
-    const result = await syncPlan({ schemaVersion: 99 }, pl);
+    const result = await syncPlan({}, pl, 'apikey');
     expect(result.ok).toBe(false);
-    expect(result.errors[0].scope).toBe('validation');
-    expect(pl.getAccounts).not.toHaveBeenCalled();
+    expect(result.errors[0].scope).toBe('validate-plan');
+    expect(pl.validateApiKey).not.toHaveBeenCalled();
+    expect(pl.exportData).not.toHaveBeenCalled();
+    expect(pl.restoreCurrentFinances).not.toHaveBeenCalled();
+    expect(pl.restorePlans).not.toHaveBeenCalled();
   });
 
-  it('upserts all unknown accounts on a fresh PL workspace', async () => {
+  it('refuses to sync without an API key', async () => {
     const pl = makePluginApiStub();
-    const result = await syncPlan(validPlan, pl);
-    expect(result.ok).toBe(true);
-    expect(result.counts.accounts).toBe(0);
-    expect(result.unresolved).toHaveLength(2);
-    expect(result.unresolved.every((u) => u.kind === 'account')).toBe(true);
+    const result = await syncPlan(makeValidPlan(), pl, '');
+    expect(result.ok).toBe(false);
+    expect(result.errors[0].message).toMatch(/apiKey is required/);
+    expect(pl.validateApiKey).not.toHaveBeenCalled();
   });
 
-  it('uses accountMap overrides to resolve and upsert accounts', async () => {
-    const pl = makePluginApiStub({
-      getAccounts: vi.fn(async () => [
-        {
-          id: 'acc_taxable',
-          name: 'Acme Brokerage Taxable',
-          type: 'TAXABLE_BROKERAGE',
-          balance: 50000,
-          currency: 'USD',
-        },
-        {
-          id: 'acc_401k',
-          name: 'Acme 401k',
-          type: 'TRADITIONAL_401K',
-          balance: 200000,
-          currency: 'USD',
-        },
-      ]),
-    });
-    const result = await syncPlan(validPlan, pl);
+  it('runs the full 4-step sequence on a valid plan', async () => {
+    const pl = makePluginApiStub();
+    const plan = makeValidPlan();
+    const result = await syncPlan(plan, pl, 'apikey');
+
     expect(result.ok).toBe(true);
-    expect(result.counts.accounts).toBe(1);
-    expect(result.skipped.accounts).toBe(1);
-    expect(pl.setAccount).toHaveBeenCalledTimes(1);
-    expect(pl.setAccount).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'acc_taxable', balance: 100000 }),
-    );
+    expect(pl.validateApiKey).toHaveBeenCalledWith({ key: 'apikey' });
+    expect(pl.exportData).toHaveBeenCalledWith({ key: 'apikey' });
+    expect(pl.restoreCurrentFinances).toHaveBeenCalledWith(plan.today, { key: 'apikey' });
+    expect(pl.restorePlans).toHaveBeenCalledWith(plan.plans, { key: 'apikey' });
+
+    expect(result.steps.map((s) => s.name)).toEqual([
+      'validate-api-key',
+      'export-data',
+      'restore-current-finances',
+      'restore-plans',
+    ]);
+    expect(result.steps.every((s) => s.ok)).toBe(true);
   });
 
-  it('is a no-op when state already matches (idempotent)', async () => {
-    const pl = makePluginApiStub({
-      getAccounts: vi.fn(async () => [
-        {
-          id: 'acc_taxable',
-          name: 'Acme Brokerage Taxable',
-          type: 'TAXABLE_BROKERAGE',
-          balance: 100000,
-          currency: 'USD',
-        },
-        {
-          id: 'acc_401k',
-          name: 'Acme 401k',
-          type: 'TRADITIONAL_401K',
-          balance: 200000,
-          currency: 'USD',
-        },
-      ]),
-      getIncomes: vi.fn(async () => [
-        {
-          id: 'inc_1',
-          label: 'Day job salary',
-          amount: 100000,
-          frequency: 'ANNUAL',
-          startDate: '2026-01-01',
-        },
-      ]),
-      getExpenses: vi.fn(async () => [
-        {
-          id: 'exp_1',
-          label: 'Living expenses',
-          amount: 60000,
-          frequency: 'ANNUAL',
-          category: 'ESSENTIAL',
-        },
-      ]),
-      getMilestones: vi.fn(async () => [
-        { id: 'm_1', label: 'Retirement', date: '2040-01-01', kind: 'RETIREMENT' },
-      ]),
-    });
-    const result = await syncPlan(validPlan, pl);
-    expect(result.ok).toBe(true);
-    expect(result.counts).toEqual({ accounts: 0, milestones: 0, income: 0, expenses: 0 });
-    expect(result.skipped).toEqual({ accounts: 2, milestones: 1, income: 1, expenses: 1 });
-    expect(pl.setAccount).not.toHaveBeenCalled();
-    expect(pl.setIncome).not.toHaveBeenCalled();
-    expect(pl.setExpense).not.toHaveBeenCalled();
-    expect(pl.setMilestone).not.toHaveBeenCalled();
+  it('never calls restoreProgress or restoreSettings', async () => {
+    const pl = makePluginApiStub();
+    await syncPlan(makeValidPlan(), pl, 'apikey');
+    expect(pl.restoreProgress).not.toHaveBeenCalled();
+    expect(pl.restoreSettings).not.toHaveBeenCalled();
   });
 
-  it('records per-call errors without aborting the whole sync', async () => {
+  it('captures the exportData result as a rollback snapshot', async () => {
+    const baseline = {
+      meta: { v: 1 },
+      today: { savingsAccounts: [{ id: 'old1', name: 'Old', type: 'savings', balance: 1 }] },
+      plans: [{ id: 'old-plan', name: 'Old' }],
+    };
+    const pl = makePluginApiStub({ exportData: vi.fn(async () => baseline) });
+    const result = await syncPlan(makeValidPlan(), pl, 'apikey');
+    expect(result.rollbackSnapshot).toEqual(baseline);
+  });
+
+  it('stops the chain if validateApiKey throws', async () => {
     const pl = makePluginApiStub({
-      getAccounts: vi.fn(async () => [
-        {
-          id: 'acc_taxable',
-          name: 'Acme Brokerage Taxable',
-          type: 'TAXABLE_BROKERAGE',
-          balance: 0,
-          currency: 'USD',
-        },
-        {
-          id: 'acc_401k',
-          name: 'Acme 401k',
-          type: 'TRADITIONAL_401K',
-          balance: 0,
-          currency: 'USD',
-        },
-      ]),
-      setAccount: vi.fn(async (a) => {
-        if (a.name === 'Acme 401k') throw new Error('401k upstream failure');
-        return a;
+      validateApiKey: vi.fn(async () => {
+        throw new Error('401 Unauthorized');
       }),
     });
-    const result = await syncPlan(validPlan, pl);
+    const result = await syncPlan(makeValidPlan(), pl, 'apikey');
+
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.scope.includes('Acme 401k'))).toBe(true);
-    expect(result.counts.accounts).toBe(1);
+    expect(pl.exportData).not.toHaveBeenCalled();
+    expect(pl.restoreCurrentFinances).not.toHaveBeenCalled();
+    expect(result.errors[0].scope).toBe('validate-api-key');
+    expect(result.errors[0].message).toMatch(/401/);
   });
 
-  it('records error when getAccounts itself fails', async () => {
+  it('stops before restore if exportData throws', async () => {
     const pl = makePluginApiStub({
-      getAccounts: vi.fn(async () => {
-        throw new Error('PL is down');
+      exportData: vi.fn(async () => {
+        throw new Error('export broke');
       }),
     });
-    const result = await syncPlan(validPlan, pl);
+    const result = await syncPlan(makeValidPlan(), pl, 'apikey');
+
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.scope === 'getAccounts')).toBe(true);
+    expect(pl.restoreCurrentFinances).not.toHaveBeenCalled();
+    expect(pl.restorePlans).not.toHaveBeenCalled();
+    expect(result.errors.some((e) => e.scope === 'export-data')).toBe(true);
   });
 
-  it('stamps startedAt and finishedAt timestamps', async () => {
+  it('still attempts restorePlans even if restoreCurrentFinances fails', async () => {
+    const pl = makePluginApiStub({
+      restoreCurrentFinances: vi.fn(async () => {
+        throw new Error('today failed');
+      }),
+    });
+    const result = await syncPlan(makeValidPlan(), pl, 'apikey');
+
+    expect(result.ok).toBe(false);
+    expect(pl.restorePlans).toHaveBeenCalled();
+    expect(result.errors.some((e) => e.scope === 'restore-current-finances')).toBe(true);
+  });
+
+  it('forwards validator warnings on the result', async () => {
+    const plan = makeValidPlan();
+    plan.today.investmentAccounts[0].type = 'mystery-type';
     const pl = makePluginApiStub();
-    const stamps = ['2026-05-11T00:00:00Z', '2026-05-11T00:00:05Z'];
-    const result = await syncPlan(validPlan, pl, {}, () => stamps.shift());
-    expect(result.startedAt).toBe('2026-05-11T00:00:00Z');
-    expect(result.finishedAt).toBe('2026-05-11T00:00:05Z');
+    const result = await syncPlan(plan, pl, 'apikey');
+    expect(result.ok).toBe(true);
+    expect(result.warnings.some((w) => w.includes('mystery-type'))).toBe(true);
+  });
+});
+
+describe('rollbackTo', () => {
+  it('rejects a missing snapshot', async () => {
+    const pl = makePluginApiStub();
+    const r = await rollbackTo(null, pl, 'apikey');
+    expect(r.ok).toBe(false);
+    expect(r.errors[0].scope).toBe('rollback');
+  });
+
+  it('rejects a missing api key', async () => {
+    const pl = makePluginApiStub();
+    const r = await rollbackTo({ today: {}, plans: [] }, pl, '');
+    expect(r.ok).toBe(false);
+    expect(r.errors[0].message).toMatch(/apiKey is required/);
+  });
+
+  it('pushes both today and plans from the snapshot', async () => {
+    const pl = makePluginApiStub();
+    const snap = {
+      today: { savingsAccounts: [{ id: 'x', name: 'X', type: 'savings', balance: 1 }] },
+      plans: [{ id: 'p', name: 'P' }],
+    };
+    const r = await rollbackTo(snap, pl, 'apikey');
+    expect(r.ok).toBe(true);
+    expect(pl.validateApiKey).toHaveBeenCalled();
+    expect(pl.restoreCurrentFinances).toHaveBeenCalledWith(snap.today, { key: 'apikey' });
+    expect(pl.restorePlans).toHaveBeenCalledWith(snap.plans, { key: 'apikey' });
+  });
+
+  it('aborts if validateApiKey throws', async () => {
+    const pl = makePluginApiStub({
+      validateApiKey: vi.fn(async () => {
+        throw new Error('bad key');
+      }),
+    });
+    const r = await rollbackTo({ today: {}, plans: [] }, pl, 'apikey');
+    expect(r.ok).toBe(false);
+    expect(pl.restoreCurrentFinances).not.toHaveBeenCalled();
+    expect(pl.restorePlans).not.toHaveBeenCalled();
   });
 });
