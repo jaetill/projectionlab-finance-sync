@@ -13,6 +13,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "node userscript/build.js",
+    "generate": "node generator/src/cli.js generate",
+    "drift": "node generator/src/cli.js drift",
+    "check": "node generator/src/cli.js check",
     "prepare": "husky || true"
   },
   "devDependencies": {

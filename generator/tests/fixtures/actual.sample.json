@@ -1,0 +1,32 @@
+{
+  "_comment": "Sanitized fixture. NOT real numbers. Shape mirrors what @actual-app/api's getAccounts() returns, simplified to fields the generator cares about.",
+  "serverUrl": "http://localhost:5006",
+  "budgetName": "Sample Budget",
+  "snapshotAt": "2026-05-27T22:00:00.000Z",
+  "accounts": [
+    {
+      "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "name": "Sample Checking",
+      "type": "checking",
+      "offbudget": false,
+      "balance": 500000,
+      "lastSyncedAt": "2026-05-27T22:00:00.000Z"
+    },
+    {
+      "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "name": "Sample Savings",
+      "type": "savings",
+      "offbudget": false,
+      "balance": 2500000,
+      "lastSyncedAt": "2026-05-27T22:00:00.000Z"
+    },
+    {
+      "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "name": "Sample TSP",
+      "type": "investment",
+      "offbudget": true,
+      "balance": 50000000,
+      "lastSyncedAt": "2026-05-27T22:00:00.000Z"
+    }
+  ]
+}
