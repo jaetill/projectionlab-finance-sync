@@ -18,17 +18,17 @@
  *   - effective: 2026-08-01
  *   - lifestyle-target: $12,000/mo
  *
- * PR-K v1 supports three levers:
- *   - effective:        ISO date when the scenario perturbation kicks in
- *   - lifestyle-target: replaces the Lifestyle expense event amount
+ * Supported levers (extended in PR-K2 with state-tax-rate):
+ *   - effective:                ISO date when the scenario perturbation kicks in
+ *   - lifestyle-target:         replaces the Lifestyle expense event amount
  *   - retirement-date.<person>: shifts the retirement milestone
- *   - one-time-event:   adds a windfall/expense at a date on a named account
+ *   - one-time-event:           adds a windfall/expense at a date on a named account
+ *   - state-tax-rate:           overrides plan.variables.localIncomeTaxRate (percent)
  *
- * Compound levers (housing-event, state-tax, etc.) are deferred; unknown
- * lever names hard-fail at parse time so silent typos don't become silent
- * projection errors.
+ * Compound levers (housing-event, etc.) are deferred — they need multi-line
+ * syntax. Unknown lever names hard-fail at parse time so silent typos don't
+ * become silent projection errors.
  */
-
 
 // ---------------------------------------------------------------------------
 // Lever whitelist
@@ -40,6 +40,7 @@ export const KNOWN_LEVERS = new Set([
   'retirement-date.jason',
   'retirement-date.heidi',
   'one-time-event',
+  'state-tax-rate',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,24 @@ export function parseOneTimeEvent(raw) {
   return { direction: polarity, amount, account, date };
 }
 
+/**
+ * Parse a state-tax-rate raw value into a percent number.
+ *   "0%"     -> 0
+ *   "5.75%"  -> 5.75
+ *   "5.75"   -> 5.75
+ *   "0"      -> 0
+ *
+ * Throws on malformed input. PL treats `plan.variables.localIncomeTaxRate`
+ * as a percent, so "5.75%" maps directly to 5.75 — don't double-divide.
+ */
+export function parseStateTaxRate(raw) {
+  const m = raw.match(/^(-?\d+(?:\.\d+)?)\s*%?$/);
+  if (!m) throw new Error(`scenarios: invalid state-tax-rate value: "${raw}"`);
+  const value = Number(m[1]);
+  if (!Number.isFinite(value)) throw new Error(`scenarios: state-tax-rate not a number: "${raw}"`);
+  return value;
+}
+
 function parseRetirementDate(raw) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
     throw new Error(`scenarios: retirement-date.* must be YYYY-MM-DD, got "${raw}"`);
@@ -152,6 +171,7 @@ export function parseScenarios(markdown) {
           'lifestyle-target': null,
           'retirement-date': {},
           'one-time-event': [],
+          'state-tax-rate': null,
         },
       };
       continue;
@@ -174,6 +194,8 @@ export function parseScenarios(markdown) {
       current.overrides['retirement-date'].heidi = parseRetirementDate(lever.raw);
     } else if (lever.name === 'one-time-event') {
       current.overrides['one-time-event'].push(parseOneTimeEvent(lever.raw));
+    } else if (lever.name === 'state-tax-rate') {
+      current.overrides['state-tax-rate'] = parseStateTaxRate(lever.raw);
     }
   }
   if (current) scenarios.push(current);
@@ -278,7 +300,15 @@ export function composeScenario(basePlan, scenario) {
     exp.frequency = 'yearly';
   }
 
-  // 5) Apply one-time-event overrides — emitted as account events
+  // 5) Apply state-tax-rate override — writes plan.variables.localIncomeTaxRate.
+  // Convention: scenario carries the percent number directly (5.75 means 5.75%).
+  const stateTaxRate = scenario.overrides['state-tax-rate'];
+  if (stateTaxRate !== null && stateTaxRate !== undefined) {
+    out.variables = out.variables || {};
+    out.variables.localIncomeTaxRate = stateTaxRate;
+  }
+
+  // 6) Apply one-time-event overrides — emitted as account events
   for (const ev of scenario.overrides['one-time-event']) {
     out.accounts = out.accounts || { events: [] };
     const signedAmt = ev.direction === 'in' ? ev.amount : -ev.amount;
