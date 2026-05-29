@@ -23,6 +23,56 @@
     "manualStalenessDays": 30
   },
   "accountMapping": {
-    "comment": "Stub for PR-A. PR-B/C/D will populate this with the mapping between Actual account UUIDs and PL account UUIDs, since the two systems generate independent IDs."
+    "comment": "Maps a memo account's externalId (slugify(displayName) unless tagged) to an Actual account UUID. Used when the memo name differs from the Actual name so the name-match fallback can't pair them. UUIDs verified against the live 'My Finances' budget 2026-05-29.",
+    "tsp-l2035-l2040-50-50": {
+      "actualId": "7dc628a9-ff3d-4156-b08b-476bd8e7c788",
+      "actualName": "Thrift Savings Plan - Civilian"
+    },
+    "ally-savings": {
+      "actualId": "80dc9553-cfae-45b4-8cae-7ea4abe1415b",
+      "actualName": "Savings Account (1146)"
+    },
+    "truist-checking": {
+      "actualId": "681154f2-da28-4d8c-bb74-8d4e33151e21",
+      "actualName": "Checking 8066 (8066)"
+    }
+  },
+  "pendingMappings": {
+    "comment": "Verified Actual UUIDs whose memo counterpart does not exist yet. Ignored by reconcile. Add the memo row (matching externalId slug), then move the entry up into accountMapping. See memo-pr-i-additions sidecar in the Financial Decisions workspace.",
+    "ally-cds-split": {
+      "note": "Memo has a single 'Ally CDs' row ($71,745 total). Split into the two CDs below + the memo-only Austin Car Fund before mapping.",
+      "high-yield-cd-18-month": {
+        "actualId": "35211f5e-3ac6-4d9f-beff-133fe5cf7aed",
+        "actualName": "High Yield CD - 18 Month (7042)"
+      },
+      "high-yield-cd-9-month": {
+        "actualId": "48cb14c1-7a0d-4f9d-a9a3-d707ba7546b4",
+        "actualName": "High Yield CD - 9 Month (1578)"
+      }
+    },
+    "virginia-529-carston": {
+      "actualId": "9847006a-06f7-4e9d-809f-5f3af2656ba3",
+      "actualName": "Jason Tilley (5673)"
+    },
+    "virginia-529-austin": {
+      "actualId": "98bd4392-6d38-4380-b2da-375e6eeb1867",
+      "actualName": "Jason Tilley (5682)"
+    },
+    "costco-anywhere-visa": {
+      "actualId": "877840b2-ca11-47fd-9a94-3af4f2a684c0",
+      "actualName": "Costco Anywhere Visa® Card by Citi-3414 (3414)"
+    },
+    "capital-one-venture-cc": {
+      "actualId": "caf6df97-2b3f-4d25-9cf8-414e12965eb4",
+      "actualName": "Venture (3531)"
+    },
+    "truist-personal-money-rate-sav-5518": {
+      "actualId": "9c45b422-5f55-4ef5-bf55-704cd7e74354",
+      "actualName": "Personal Money Rate SAV 5518 (5518)"
+    },
+    "chase-mortgage": {
+      "actualId": "a3364d12-c2be-438e-96f7-d4eaeb4cd390",
+      "actualName": "MORTGAGE LOAN (7523)"
+    }
   }
 }

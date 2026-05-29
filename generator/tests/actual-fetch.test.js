@@ -58,7 +58,13 @@ function materializeFixture(now) {
  * Records the calls so tests can assert wiring (groupId, not cloudFileId, etc.).
  */
 function makeFakeApi(fixture, overrides = {}) {
-  const calls = { init: [], downloadBudget: [], getTransactions: [], shutdown: 0 };
+  const calls = {
+    init: [],
+    downloadBudget: [],
+    getTransactions: [],
+    getAccountBalance: [],
+    shutdown: 0,
+  };
   const api = {
     init: vi.fn(async (cfg) => {
       calls.init.push(cfg);
@@ -68,6 +74,16 @@ function makeFakeApi(fixture, overrides = {}) {
       calls.downloadBudget.push({ syncId, opts });
     }),
     getAccounts: vi.fn(async () => fixture.getAccounts),
+    // getAccountBalance is the authoritative balance source (see actual.js).
+    // Default: echo the fixture account's balance so existing balance
+    // assertions hold. overrides.balances[id] lets a test return a value that
+    // DIFFERS from the stale getAccounts().balance field, proving precedence.
+    getAccountBalance: vi.fn(async (id) => {
+      calls.getAccountBalance.push(id);
+      if (overrides.balances && id in overrides.balances) return overrides.balances[id];
+      const acct = fixture.getAccounts.find((a) => a.id === id);
+      return acct ? acct.balance : 0;
+    }),
     getCategories: vi.fn(async () => fixture.getCategories),
     getCategoryGroups: vi.fn(async () => fixture.getCategoryGroups),
     getTransactions: vi.fn(async (accountId, start, end) => {
@@ -358,6 +374,28 @@ describe('fetchActualSnapshot (integration with injected api)', () => {
     expect(checking.balance).toBe(15000);
     const cc = snap.accounts.find((a) => a.name === 'Sample Credit Card');
     expect(cc.balance).toBe(-1200);
+  });
+
+  it('fetches balance via getAccountBalance once per account', async () => {
+    // Regression guard: getAccounts() does not populate a usable balance, so
+    // the snapshot must call getAccountBalance(id) for every account.
+    const fixture = materializeFixture(now);
+    const { api, calls } = makeFakeApi(fixture);
+    await fetchActualSnapshot({ env: BASE_ENV, api, now });
+    const expectedIds = fixture.getAccounts.map((a) => a.id);
+    expect(calls.getAccountBalance.sort()).toEqual([...expectedIds].sort());
+  });
+
+  it('uses getAccountBalance, NOT the stale getAccounts().balance field', async () => {
+    // The whole point of the fix: getAccounts().balance is unreliable
+    // (null/wrong for off-budget accounts). Here the stale field says
+    // $15,000 but the authoritative getAccountBalance says $99,999 — the
+    // snapshot must reflect the authoritative value.
+    const fixture = materializeFixture(now);
+    const { api } = makeFakeApi(fixture, { balances: { 'acct-checking': 9999900 } });
+    const snap = await fetchActualSnapshot({ env: BASE_ENV, api, now });
+    const checking = snap.accounts.find((a) => a.name === 'Sample Checking');
+    expect(checking.balance).toBe(99999);
   });
 
   it('rolls up category spend, excluding income/transfers/uncategorized', async () => {
