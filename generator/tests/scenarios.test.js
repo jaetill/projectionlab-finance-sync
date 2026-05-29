@@ -6,6 +6,7 @@ import {
   parseLeverLine,
   parseLifestyleTarget,
   parseOneTimeEvent,
+  parseStateTaxRate,
   parseScenarios,
   composeScenario,
   composeScenarioPlans,
@@ -177,11 +178,114 @@ describe('parseScenarios', () => {
     expect(() => parseScenarios(bad)).toThrow(/YYYY-MM-DD/);
   });
 
-  it('KNOWN_LEVERS exposes the v1 set', () => {
+  it('KNOWN_LEVERS exposes the v1 set + PR-K2 state-tax-rate', () => {
     expect(KNOWN_LEVERS.has('lifestyle-target')).toBe(true);
     expect(KNOWN_LEVERS.has('retirement-date.jason')).toBe(true);
     expect(KNOWN_LEVERS.has('one-time-event')).toBe(true);
+    expect(KNOWN_LEVERS.has('state-tax-rate')).toBe(true);
     expect(KNOWN_LEVERS.has('housing-event')).toBe(false); // deferred
+  });
+});
+
+describe('parseStateTaxRate', () => {
+  it('parses percent with trailing %', () => {
+    expect(parseStateTaxRate('5.75%')).toBe(5.75);
+  });
+
+  it('parses bare number (no %)', () => {
+    expect(parseStateTaxRate('5.75')).toBe(5.75);
+  });
+
+  it('parses zero', () => {
+    expect(parseStateTaxRate('0%')).toBe(0);
+    expect(parseStateTaxRate('0')).toBe(0);
+  });
+
+  it('parses integer rate', () => {
+    expect(parseStateTaxRate('7%')).toBe(7);
+  });
+
+  it('throws on malformed input', () => {
+    expect(() => parseStateTaxRate('five percent')).toThrow(/invalid/);
+    expect(() => parseStateTaxRate('5.75% ish')).toThrow(/invalid/);
+    expect(() => parseStateTaxRate('')).toThrow(/invalid/);
+  });
+});
+
+describe('parseScenarios — state-tax-rate', () => {
+  it('captures state-tax-rate override', () => {
+    const md = [
+      '## Scenarios',
+      '',
+      '### move-to-tn',
+      '- effective: 2027-01-01',
+      '- state-tax-rate: 0%',
+      '',
+    ].join('\n');
+    const scenarios = parseScenarios(md);
+    expect(scenarios[0].overrides['state-tax-rate']).toBe(0);
+  });
+
+  it('defaults state-tax-rate to null when not set', () => {
+    const md = ['## Scenarios', '', '### base', 'no overrides', ''].join('\n');
+    expect(parseScenarios(md)[0].overrides['state-tax-rate']).toBeNull();
+  });
+});
+
+describe('composeScenario — state-tax-rate', () => {
+  function baseT() {
+    return {
+      id: 'plan-base',
+      name: 'Base',
+      active: true,
+      milestones: [],
+      income: { events: [] },
+      expenses: { events: [] },
+      accounts: { events: [] },
+      assets: { events: [] },
+      variables: { localIncomeTaxRate: 5.75 },
+    };
+  }
+
+  it('writes plan.variables.localIncomeTaxRate when set', () => {
+    const out = composeScenario(baseT(), {
+      name: 'tn',
+      slug: 'tn',
+      overrides: {
+        'retirement-date': {},
+        'one-time-event': [],
+        'state-tax-rate': 0,
+      },
+    });
+    expect(out.variables.localIncomeTaxRate).toBe(0);
+  });
+
+  it('leaves variables.localIncomeTaxRate alone when override is null', () => {
+    const out = composeScenario(baseT(), {
+      name: 'b',
+      slug: 'b',
+      overrides: {
+        'retirement-date': {},
+        'one-time-event': [],
+        'state-tax-rate': null,
+      },
+    });
+    expect(out.variables.localIncomeTaxRate).toBe(5.75);
+  });
+
+  it('creates variables object when base plan lacks one', () => {
+    const bareBase = baseT();
+    delete bareBase.variables;
+    const out = composeScenario(bareBase, {
+      name: 't',
+      slug: 't',
+      overrides: {
+        'retirement-date': {},
+        'one-time-event': [],
+        'state-tax-rate': 4,
+      },
+    });
+    expect(out.variables.localIncomeTaxRate).toBe(4);
   });
 });
 
