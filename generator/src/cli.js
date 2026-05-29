@@ -84,8 +84,11 @@ function parseInvocation(argv) {
   });
 
   if (values.help) printHelpAndExit(0);
-  if (!values.memo) fail('--memo <path> is required');
-  const memoPath = resolve(values.memo);
+  // --memo flag wins; fall back to MEMO_PATH env var so you can set it once
+  // per user and run `npm run check` with no args.
+  const memoArg = values.memo || process.env.MEMO_PATH;
+  if (!memoArg) fail('--memo <path> is required (or set MEMO_PATH env var)');
+  const memoPath = resolve(memoArg);
   if (!existsSync(memoPath)) fail(`memo not found at: ${memoPath}`);
 
   return {
