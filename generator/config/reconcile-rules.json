@@ -1,0 +1,28 @@
+{
+  "$schema": "./reconcile-rules.schema.json",
+  "comment": "Drift thresholds, source priorities, and account mapping for the generator. Edit to tune behavior; the reconcile module reads this at runtime.",
+  "schemaVersion": 1,
+  "sourcePriority": {
+    "comment": "Per-field, which source wins when both have a value. memo = jason_finance.md; tracker = Actual Budget; manual = static entry in src/sources/manual.js",
+    "balance": ["tracker", "memo", "manual"],
+    "accountName": ["memo", "tracker"],
+    "accountType": ["memo", "tracker"],
+    "accountOwner": ["memo"],
+    "growthAssumption": ["memo"],
+    "milestones": ["memo"],
+    "incomeStreams": ["memo"],
+    "expenseStreams": ["memo"]
+  },
+  "driftThresholds": {
+    "comment": "Per-account-class, the absolute-dollar drift between memo and tracker before it gets logged in _drift. Investment accounts always log (any drift is signal). Manual accounts log staleness in days.",
+    "checking": 100.0,
+    "savings": 500.0,
+    "creditCard": 100.0,
+    "cd": 50.0,
+    "investment": 0.0,
+    "manualStalenessDays": 30
+  },
+  "accountMapping": {
+    "comment": "Stub for PR-A. PR-B/C/D will populate this with the mapping between Actual account UUIDs and PL account UUIDs, since the two systems generate independent IDs."
+  }
+}

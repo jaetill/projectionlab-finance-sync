@@ -4,7 +4,11 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.js'],
-    include: ['tests/**/*.test.js'],
+    include: [
+      'tests/**/*.test.js',
+      'generator/tests/**/*.test.js',
+      'mcp-server/tests/**/*.test.js',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

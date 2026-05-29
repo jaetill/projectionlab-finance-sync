@@ -1,0 +1,167 @@
+{
+  "_comment": "Sanitized Actual Budget API response shapes. The keys mirror what @actual-app/api returns; values are scaled placeholders for tests. NOT real numbers.",
+
+  "getBudgets": [
+    { "name": "Sample Household", "groupId": "GROUP-AAAA", "cloudFileId": "CLOUD-XXXX" },
+    { "name": "Other File", "groupId": "GROUP-BBBB", "cloudFileId": "CLOUD-YYYY" }
+  ],
+
+  "getAccounts": [
+    {
+      "id": "acct-checking",
+      "name": "Sample Checking",
+      "type": "checking",
+      "closed": false,
+      "offbudget": false,
+      "balance": 1500000,
+      "last_reconciled": "__RECENT__"
+    },
+    {
+      "id": "acct-savings",
+      "name": "Sample Savings",
+      "type": "savings",
+      "closed": false,
+      "offbudget": false,
+      "balance": 5000000,
+      "last_reconciled": "__RECENT__"
+    },
+    {
+      "id": "acct-cc",
+      "name": "Sample Credit Card",
+      "type": "credit",
+      "closed": false,
+      "offbudget": false,
+      "balance": -120000,
+      "last_reconciled": "__RECENT__"
+    },
+    {
+      "id": "acct-tsp",
+      "name": "Sample TSP",
+      "type": "investment",
+      "closed": false,
+      "offbudget": true,
+      "balance": 50000000,
+      "last_reconciled": "__STALE__"
+    },
+    {
+      "id": "acct-old-closed",
+      "name": "Old Closed Account",
+      "type": "checking",
+      "closed": true,
+      "offbudget": false,
+      "balance": 0,
+      "last_reconciled": null
+    }
+  ],
+
+  "getCategoryGroups": [
+    { "id": "grp-fixed", "name": "Fixed Bills" },
+    { "id": "grp-variable", "name": "Variable" },
+    { "id": "grp-giving", "name": "Giving" },
+    { "id": "grp-income", "name": "Income" }
+  ],
+
+  "getCategories": [
+    { "id": "cat-groceries", "name": "Groceries", "group_id": "grp-variable", "is_income": false },
+    {
+      "id": "cat-restaurants",
+      "name": "Restaurants",
+      "group_id": "grp-variable",
+      "is_income": false
+    },
+    { "id": "cat-utilities", "name": "Utilities", "group_id": "grp-fixed", "is_income": false },
+    { "id": "cat-tithing", "name": "Tithing", "group_id": "grp-giving", "is_income": false },
+    { "id": "cat-salary", "name": "Salary", "group_id": "grp-income", "is_income": true }
+  ],
+
+  "getTransactions": {
+    "_note": "Window: 90 days. Amounts in cents; negatives are outflows; positives are inflows. Mix includes one unmarked transfer, one uncategorized, transfers across accounts, and income to verify exclusion.",
+    "acct-checking": [
+      {
+        "id": "t1",
+        "date": "__T_RECENT_1__",
+        "amount": -15000,
+        "payee_name": "Local Grocer",
+        "category": "cat-groceries",
+        "transfer_id": null
+      },
+      {
+        "id": "t2",
+        "date": "__T_RECENT_2__",
+        "amount": -8000,
+        "payee_name": "Diner",
+        "category": "cat-restaurants",
+        "transfer_id": null
+      },
+      {
+        "id": "t3",
+        "date": "__T_RECENT_3__",
+        "amount": -12000,
+        "payee_name": "Power Co",
+        "category": "cat-utilities",
+        "transfer_id": null
+      },
+      {
+        "id": "t4",
+        "date": "__T_RECENT_4__",
+        "amount": -50000,
+        "payee_name": "Church",
+        "category": "cat-tithing",
+        "transfer_id": null
+      },
+      {
+        "id": "t5",
+        "date": "__T_RECENT_5__",
+        "amount": 500000,
+        "payee_name": "Employer",
+        "category": "cat-salary",
+        "transfer_id": null
+      },
+      {
+        "id": "t6",
+        "date": "__T_RECENT_6__",
+        "amount": -2000,
+        "payee_name": "Mystery Vendor",
+        "category": null,
+        "transfer_id": null
+      },
+      {
+        "id": "t7",
+        "date": "__T_RECENT_7__",
+        "amount": -10000,
+        "payee_name": "Transfer to Savings",
+        "category": null,
+        "transfer_id": null
+      },
+      {
+        "id": "t8",
+        "date": "__T_RECENT_8__",
+        "amount": -25000,
+        "payee_name": "Savings Account",
+        "category": null,
+        "transfer_id": "xfer-1"
+      }
+    ],
+    "acct-savings": [
+      {
+        "id": "t9",
+        "date": "__T_RECENT_8__",
+        "amount": 25000,
+        "payee_name": "From Checking",
+        "category": null,
+        "transfer_id": "xfer-1"
+      }
+    ],
+    "acct-cc": [
+      {
+        "id": "t10",
+        "date": "__T_RECENT_1__",
+        "amount": -7000,
+        "payee_name": "Restaurant 2",
+        "category": "cat-restaurants",
+        "transfer_id": null
+      }
+    ],
+    "acct-tsp": []
+  }
+}

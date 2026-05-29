@@ -1,0 +1,20 @@
+{
+  "name": "projectionlab-finance-sync-mcp",
+  "version": "0.1.0",
+  "description": "MCP server wrapping the generator so Claude can run plan generation + drift checks + ad-hoc scenario what-ifs from chat.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -20,6 +20,7 @@ data/*.json
 # Explicit re-denial of known-sensitive filenames (belt + suspenders, in case
 # the allowlist above ever gets weakened).
 data/plan.json
+data/drift.md
 data/pl-export.json
 
 # API key + local-only files
