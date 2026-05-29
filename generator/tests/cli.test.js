@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 
 // PR-A scaffold tests. Verify the scaffold exists and modules are loadable.
 // Real behavior tests for each subcommand land alongside their implementations.
+// (Memo parsing moved from a stub to a real implementation in PR-B; see
+// memo-parse.test.js for that coverage.)
 
 describe('generator scaffold', () => {
   it('has the expected directory structure', () => {
@@ -31,13 +33,12 @@ describe('generator scaffold', () => {
     await expect(import('../src/emit.js')).resolves.toBeDefined();
   });
 
-  it("stubs throw with helpful 'not implemented' messages", async () => {
-    const { parseMemo } = await import('../src/sources/memo.js');
+  it("remaining stubs throw with helpful 'not implemented' messages", async () => {
+    // parseMemo is implemented as of PR-B (see memo-parse.test.js for coverage).
     const { fetchActualSnapshot } = await import('../src/sources/actual.js');
     const { reconcile } = await import('../src/reconcile.js');
     const { emit } = await import('../src/emit.js');
 
-    await expect(parseMemo('/tmp/x')).rejects.toThrow(/PR-B scope/);
     await expect(fetchActualSnapshot()).rejects.toThrow(/PR-C scope/);
     expect(() => reconcile({})).toThrow(/PR-D scope/);
     await expect(emit({}, { dryRun: false })).rejects.toThrow(/PR-E scope/);
