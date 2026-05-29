@@ -147,7 +147,11 @@ export function computeSanityChecks(txns, rawAccounts, now = new Date()) {
   // Uncategorized excludes things already caught by the unmarked-transfer
   // bucket; each row should motivate exactly one action.
   const uncategorized = txns.filter(
-    (t) => !t.transfer_id && (t.category === null || t.category === undefined) && !t.is_parent && !looksLikeTransfer(t),
+    (t) =>
+      !t.transfer_id &&
+      (t.category === null || t.category === undefined) &&
+      !t.is_parent &&
+      !looksLikeTransfer(t),
   ).length;
 
   const staleAccounts = [];
