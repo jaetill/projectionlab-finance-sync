@@ -33,12 +33,16 @@ describe('generator scaffold', () => {
     await expect(import('../src/emit.js')).resolves.toBeDefined();
   });
 
-  it("remaining stubs throw with helpful 'not implemented' messages", async () => {
-    // parseMemo (PR-B), fetchActualSnapshot (PR-C), and reconcile (PR-D) are
-    // implemented; see their respective *.test.js files for coverage.
-    const { emit } = await import('../src/emit.js');
-
-    await expect(emit({}, { dryRun: false })).rejects.toThrow(/PR-E scope/);
+  it('all sub-module exports are now implemented (no stubs left)', async () => {
+    // PR-B through PR-E. Each has its own *.test.js with full coverage.
+    const memo = await import('../src/sources/memo.js');
+    const actual = await import('../src/sources/actual.js');
+    const recon = await import('../src/reconcile.js');
+    const emitMod = await import('../src/emit.js');
+    expect(typeof memo.parseMemo).toBe('function');
+    expect(typeof actual.fetchActualSnapshot).toBe('function');
+    expect(typeof recon.reconcile).toBe('function');
+    expect(typeof emitMod.emit).toBe('function');
   });
 
   it('manual source returns empty array (no entries yet)', async () => {
