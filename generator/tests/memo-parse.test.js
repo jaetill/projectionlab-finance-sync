@@ -407,3 +407,153 @@ describe('parseMemo (integration against fixture)', () => {
     expect(a.sourceSha).toBe(b.sourceSha);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PR-I — Account Registry + Spending Targets parsers
+// ---------------------------------------------------------------------------
+
+describe('parseAccountRegistry', () => {
+  it('parses a clean Registry table', () => {
+    const md = [
+      '## Account Registry',
+      '',
+      '| Account                    | Institution / # | Owner  | Type        | Status     | Intent              |',
+      '| -------------------------- | --------------- | ------ | ----------- | ---------- | ------------------- |',
+      '| TSP                        | tsp.gov         | Jason  | 401(k)      | live       | Primary retirement  |',
+      '| MassMutual Roth — ACCT123  | MassMutual      | Heidi  | Roth IRA    | pending-out| Rolling to Vanguard |',
+      '| 33 Biscayne                | (home)          | Joint  | real-estate | memo-only  | Primary residence   |',
+    ].join('\n');
+    const { findSectionTable, parseAccountRegistry } = require('../src/sources/memo.js');
+    const table = findSectionTable(md, 'Account Registry');
+    const accounts = parseAccountRegistry(table);
+    expect(accounts).toHaveLength(3);
+    const tsp = accounts.find((a) => a.displayName === 'TSP');
+    expect(tsp).toMatchObject({
+      type: '401(k)',
+      owner: 'jason',
+      status: 'live',
+      institution: 'tsp.gov',
+      balance: null,
+    });
+    const mm = accounts.find((a) => a.displayName.startsWith('MassMutual'));
+    expect(mm.accountNumber).toBe('ACCT123');
+    expect(mm.status).toBe('pending-out');
+  });
+
+  it('throws on missing required columns', () => {
+    const { parseAccountRegistry } = require('../src/sources/memo.js');
+    expect(() => parseAccountRegistry({ header: ['Foo'], rows: [] })).toThrow(/Account.+Type/);
+  });
+
+  it('skips bold summary rows', () => {
+    const { parseAccountRegistry } = require('../src/sources/memo.js');
+    const table = {
+      header: ['Account', 'Type'],
+      rows: [
+        ['TSP', '401(k)'],
+        ['**Total**', '**—**'],
+      ],
+    };
+    expect(parseAccountRegistry(table)).toHaveLength(1);
+  });
+});
+
+describe('parseSpendingTargets', () => {
+  it('parses target amounts and category tags', () => {
+    const md = [
+      '## Spending Targets',
+      '',
+      '| Stream      | Monthly Target | Note                                                     |',
+      '| ----------- | -------------- | -------------------------------------------------------- |',
+      '| Lifestyle   | $9,700         | Anchor for projection; Actual reports observed [category:lifestyle] |',
+      '| Giving      | $1,558         | Aspiration through retirement [category:giving]          |',
+      '| **Total**   | **$11,258**    |                                                          |',
+    ].join('\n');
+    const { findSectionTable, parseSpendingTargets } = require('../src/sources/memo.js');
+    const table = findSectionTable(md, 'Spending Targets');
+    const targets = parseSpendingTargets(table);
+    expect(targets).toHaveLength(2);
+    expect(targets[0]).toMatchObject({
+      stream: 'Lifestyle',
+      monthlyTarget: 9700,
+      category: 'lifestyle',
+    });
+    expect(targets[1].monthlyTarget).toBe(1558);
+  });
+
+  it('throws on missing required columns', () => {
+    const { parseSpendingTargets } = require('../src/sources/memo.js');
+    expect(() => parseSpendingTargets({ header: ['Foo'], rows: [] })).toThrow(
+      /Stream.+Monthly Target/,
+    );
+  });
+});
+
+describe('parseMemo integration: Account Registry preferred over Assets', () => {
+  it('returns Registry accounts (no balances) when only Registry present', async () => {
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'memo-pri-'));
+    const memoPath = join(dir, 'memo.md');
+    try {
+      const md = [
+        '# Memo',
+        '',
+        '## Account Registry',
+        '',
+        '| Account | Institution / # | Owner | Type     | Status | Intent  |',
+        '| ------- | --------------- | ----- | -------- | ------ | ------- |',
+        '| TSP     | tsp.gov         | Jason | 401(k)   | live   | Primary |',
+        '',
+        '## Income Picture (Monthly)',
+        '',
+        '| Source | Amount  | Notes |',
+        '| ------ | ------- | ----- |',
+        '| Salary | $10,000 | base  |',
+      ].join('\n');
+      await writeFile(memoPath, md);
+      const { parseMemo } = await import('../src/sources/memo.js');
+      const memo = await parseMemo(memoPath);
+      expect(memo.accounts).toHaveLength(1);
+      expect(memo.accounts[0].type).toBe('401(k)');
+      expect(memo.accounts[0].balance).toBeNull();
+      expect(memo.spendingTargets).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('merges legacy Assets balances onto Registry rows during parallel-run', async () => {
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'memo-pri-'));
+    const memoPath = join(dir, 'memo.md');
+    try {
+      const md = [
+        '# Memo',
+        '',
+        '## Account Registry',
+        '',
+        '| Account | Institution / # | Owner | Type   | Status | Intent  |',
+        '| ------- | --------------- | ----- | ------ | ------ | ------- |',
+        '| TSP     | tsp.gov         | Jason | 401(k) | live   | Primary |',
+        '',
+        '## Assets',
+        '',
+        '| Account | Balance     | Notes               |',
+        '| ------- | ----------- | ------------------- |',
+        '| TSP     | $1,000,000  | from legacy section |',
+      ].join('\n');
+      await writeFile(memoPath, md);
+      const { parseMemo } = await import('../src/sources/memo.js');
+      const memo = await parseMemo(memoPath);
+      const tsp = memo.accounts.find((a) => a.displayName === 'TSP');
+      expect(tsp.balance).toBe(1000000);
+      expect(tsp.type).toBe('401(k)'); // Registry wins for type
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

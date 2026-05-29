@@ -4,9 +4,11 @@
  * Targeted parsing: reads specific markdown TABLES only. The surrounding prose
  * is for humans and AI advisors and is intentionally left alone.
  *
- * Sections currently parsed:
- *   - "## Assets"                  -> accounts[]
+ * Sections currently parsed (in order of preference; new format wins):
+ *   - "## Account Registry"        -> accounts[] (new — institutional + intent only, no balances)
+ *   - "## Assets"                  -> accounts[] (legacy — value-bearing rows)
  *   - "## Income Picture (Monthly)" -> income[]
+ *   - "## Spending Targets"        -> spendingTargets[] (new — aspiration anchors)
  *
  * Memo conventions the parser expects:
  *   - Assets table columns: Account | Balance | Notes
@@ -206,6 +208,83 @@ function indexOfHeader(headers, name) {
 }
 
 /**
+ * Parse the Account Registry table (new format, no balances).
+ * Expected columns: Account | Institution / # | Owner | Type | Status | Intent
+ * Bold summary rows skipped.
+ */
+export function parseAccountRegistry(table) {
+  if (!table) return [];
+  const accountCol = indexOfHeader(table.header, 'Account');
+  const institutionCol = indexOfHeader(table.header, 'Institution / #');
+  const ownerCol = indexOfHeader(table.header, 'Owner');
+  const typeCol = indexOfHeader(table.header, 'Type');
+  const statusCol = indexOfHeader(table.header, 'Status');
+  const intentCol = indexOfHeader(table.header, 'Intent');
+  if (accountCol < 0 || typeCol < 0) {
+    throw new Error(
+      `memo Account Registry table missing required columns ("Account" and/or "Type"); got headers: ${table.header.join(' | ')}`,
+    );
+  }
+  const accounts = [];
+  for (const row of table.rows) {
+    const accountCell = (row[accountCol] || '').trim();
+    if (!accountCell || accountCell.startsWith('**')) continue;
+    const { displayName, accountNumber } = splitDisplayName(accountCell);
+    const status = (statusCol >= 0 ? row[statusCol] || '' : '').trim().toLowerCase() || null;
+    accounts.push({
+      displayName,
+      accountNumber,
+      balance: null, // Registry has no balances by design — Actual or memo-legacy supplies them
+      balanceRaw: '',
+      asOf: null,
+      institution: institutionCol >= 0 ? (row[institutionCol] || '').trim() || null : null,
+      owner: ownerCol >= 0 ? (row[ownerCol] || '').trim().toLowerCase() || null : null,
+      type: (row[typeCol] || '').trim().toLowerCase() || null,
+      status: status === '—' || status === '' ? null : status,
+      intent: intentCol >= 0 ? (row[intentCol] || '').trim() || null : null,
+      splits: null,
+      growthAssumption: null,
+      uuid: null,
+      notes: '',
+    });
+  }
+  return accounts;
+}
+
+/**
+ * Parse the Spending Targets table (new format, target amounts only).
+ * Expected columns: Stream | Monthly Target | Note
+ */
+export function parseSpendingTargets(table) {
+  if (!table) return [];
+  const streamCol = indexOfHeader(table.header, 'Stream');
+  const targetCol = indexOfHeader(table.header, 'Monthly Target');
+  const noteCol = indexOfHeader(table.header, 'Note');
+  if (streamCol < 0 || targetCol < 0) {
+    throw new Error(
+      `memo Spending Targets table missing required columns ("Stream" and/or "Monthly Target"); got headers: ${table.header.join(' | ')}`,
+    );
+  }
+  const targets = [];
+  for (const row of table.rows) {
+    const stream = (row[streamCol] || '').trim();
+    if (!stream || stream.startsWith('**')) continue;
+    const amountCell = row[targetCol] || '';
+    const noteCell = noteCol >= 0 ? row[noteCol] || '' : '';
+    const { amount: monthlyTarget } = parseMoney(amountCell);
+    const { tags, prose: note } = parseInlineTags(noteCell);
+    targets.push({
+      stream,
+      monthlyTarget,
+      monthlyTargetRaw: amountCell.trim(),
+      category: tags.category || null,
+      note,
+    });
+  }
+  return targets;
+}
+
+/**
  * Parse the Assets table into MemoAccount[].
  * Bold summary rows (cells starting with `**`) are skipped.
  */
@@ -291,16 +370,56 @@ export function parseIncomeTable(table) {
 export async function parseMemo(memoPath) {
   const content = await readFile(memoPath, 'utf8');
   const sourceSha = createHash('sha256').update(content).digest('hex');
+
+  // Prefer Account Registry (new, no balances) over the legacy Assets table.
+  // During migration the memo can carry both; Registry wins for structural
+  // fields, balances flow from Actual or — if memo still has Assets — get
+  // merged in by accountNumber match.
+  const registryTable = findSectionTable(content, 'Account Registry');
   const assetsTable = findSectionTable(content, 'Assets');
+  let accounts;
+  if (registryTable) {
+    accounts = parseAccountRegistry(registryTable);
+    // If the legacy Assets table is still present, merge its balances onto
+    // matching Registry rows so the value data isn't lost mid-migration.
+    if (assetsTable) {
+      const legacy = parseAccountsTable(assetsTable);
+      for (const acct of accounts) {
+        const match = legacy.find(
+          (l) =>
+            (acct.accountNumber && l.accountNumber === acct.accountNumber) ||
+            l.displayName.toLowerCase() === acct.displayName.toLowerCase(),
+        );
+        if (match) {
+          if (match.balance !== null) {
+            acct.balance = match.balance;
+            acct.balanceRaw = match.balanceRaw;
+            acct.asOf = match.asOf;
+          }
+          if (!acct.splits && match.splits) acct.splits = match.splits;
+          if (!acct.growthAssumption && match.growthAssumption !== null)
+            acct.growthAssumption = match.growthAssumption;
+          if (!acct.uuid && match.uuid) acct.uuid = match.uuid;
+        }
+      }
+    }
+  } else {
+    accounts = parseAccountsTable(assetsTable);
+  }
+
   const incomeTable = findSectionTable(content, 'Income Picture (Monthly)');
-  const accounts = parseAccountsTable(assetsTable);
   const income = parseIncomeTable(incomeTable);
+
+  const targetsTable = findSectionTable(content, 'Spending Targets');
+  const spendingTargets = parseSpendingTargets(targetsTable);
+
   const scenarios = parseScenarios(content);
   return {
     sourcePath: memoPath,
     sourceSha,
     accounts,
     income,
+    spendingTargets,
     milestones: [],
     scenarios,
   };
