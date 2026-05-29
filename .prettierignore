@@ -12,3 +12,4 @@ data/plan.json
 CHANGELOG.md
 # Pre-commit config contains a multi-line bash one-liner Prettier can't parse safely.
 .pre-commit-config.yaml
+package-lock.json

@@ -34,12 +34,10 @@ describe('generator scaffold', () => {
   });
 
   it("remaining stubs throw with helpful 'not implemented' messages", async () => {
-    // parseMemo (PR-B) and fetchActualSnapshot (PR-C) are implemented; see
-    // memo-parse.test.js and actual-fetch.test.js for their coverage.
-    const { reconcile } = await import('../src/reconcile.js');
+    // parseMemo (PR-B), fetchActualSnapshot (PR-C), and reconcile (PR-D) are
+    // implemented; see their respective *.test.js files for coverage.
     const { emit } = await import('../src/emit.js');
 
-    expect(() => reconcile({})).toThrow(/PR-D scope/);
     await expect(emit({}, { dryRun: false })).rejects.toThrow(/PR-E scope/);
   });
 
