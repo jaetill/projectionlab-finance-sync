@@ -33,6 +33,8 @@
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
+import { parseScenarios } from '../scenarios.js';
+
 // ---------------------------------------------------------------------------
 // Helpers (exported for testability)
 // ---------------------------------------------------------------------------
@@ -293,11 +295,13 @@ export async function parseMemo(memoPath) {
   const incomeTable = findSectionTable(content, 'Income Picture (Monthly)');
   const accounts = parseAccountsTable(assetsTable);
   const income = parseIncomeTable(incomeTable);
+  const scenarios = parseScenarios(content);
   return {
     sourcePath: memoPath,
     sourceSha,
     accounts,
     income,
     milestones: [],
+    scenarios,
   };
 }

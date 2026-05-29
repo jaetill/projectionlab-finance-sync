@@ -32,6 +32,7 @@ import { fileURLToPath } from 'node:url';
 
 import { validatePlan } from '../../userscript/src/plan-validator.js';
 import { slugify } from './reconcile.js';
+import { composeScenarioPlans } from './scenarios.js';
 
 // ---------------------------------------------------------------------------
 // Bucketing + defaults
@@ -281,8 +282,14 @@ export async function emit(reconciled, opts = {}) {
     buckets[bucketFor(acct)].push(acct);
   }
 
+  // If memo declared scenarios, materialize one PL plan per scenario from the
+  // first base plan as a template; otherwise pass through base.plans verbatim.
+  const composed = composeScenarioPlans(base?.plans?.[0] || null, reconciled.scenarios);
+  const planList = composed || base.plans || [];
+
   const newPlan = {
     ...base,
+    plans: planList,
     _meta: buildMeta(reconciled, now),
     today: {
       ...baseToday,

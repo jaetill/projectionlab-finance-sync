@@ -283,5 +283,6 @@ export function reconcile(input) {
     unmatchedMemo: pairs.filter((p) => !p.actual).map((p) => p.memo.displayName),
     unmatchedActual: actualOnly.map((a) => a.name),
     sanityChecks: actualSnapshot?.sanityChecks ?? null,
+    scenarios: input.memo?.scenarios || [],
   };
 }
