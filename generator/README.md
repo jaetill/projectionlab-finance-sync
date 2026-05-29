@@ -2,24 +2,25 @@
 
 ## Status
 
-**Active build, Phase 3 of the buildout plan.** PR-A (this directory) is the scaffold — directory layout, CLI skeleton, stubs, config file. No real functionality yet.
+**Phase 3 DONE as of 2026-05-29.** End-to-end pipeline runs against the real `jason_finance.md`. Companion MCP server in `../mcp-server/` (PR-J scaffold). 290 tests across the suite.
 
 ## What this is
 
-A Node CLI that produces `data/plan.json` by reconciling two sources:
+A Node CLI that produces `data/plan.json` by reconciling three sources:
 
-1. **The private finance memo** (`jason_finance.md`, never inside this repo — passed as a CLI flag from its real location on disk). Targeted markdown table parsing only; prose is for humans.
-2. **The live tracker** (currently Actual Budget on `localhost:5006` via `@actual-app/api`). Source-of-truth for balances on accounts it sees.
+1. **The private finance memo** (`jason_finance.md`, never inside this repo — passed as a CLI flag from its real location on disk). Targeted markdown table parsing only; prose is for humans. Supports new `## Account Registry` + `## Spending Targets` + `## Scenarios` sections alongside legacy `## Assets` + `## Income Picture` during migration.
+2. **The live tracker** (Actual Budget on `localhost:5006` via `@actual-app/api`). Source-of-truth for balances on accounts it sees. Optional; generator runs memo-only when env not configured.
+3. **Manual entries** (`src/sources/manual.js`) for accounts neither memo nor tracker can speak for. Currently empty.
 
 Output:
 
-- `data/plan.json` — consumed by the userscript and pushed into ProjectionLab. The shape matches `data/plan.example.json`.
-- `_drift` keys — per-account deltas between memo and tracker beyond configured thresholds. Audit info, not a blocker.
-- `_provenance` keys — which field came from which source. Audit info.
+- `data/plan.json` — consumed by the userscript and pushed into ProjectionLab. The shape matches `data/plan.example.json`. Wholesale-restore semantics: anything not in the file gets dropped from PL on next sync.
+- `data/drift.md` — human-readable diff between memo and Actual; sanity-check signals; skipped accounts.
+- `_meta`, `_drift`, `_provenance` keys on plan.json — audit info, ignored by PL.
 
 ## Architecture
 
-Tracker-agnostic: swap `src/sources/actual.js` for another tracker source and the rest of the pipeline stays the same. See `projectionlab-finance-sync-spec-v2.md` in the Financial Decisions workspace for the reconciliation rules and rationale.
+See [`docs/architecture/generator.md`](../docs/architecture/generator.md) for the full module map, data flow, and field-ownership matrix. Quick tree:
 
 ```
 generator/
@@ -29,18 +30,24 @@ generator/
 ├── src/
 │   ├── cli.js                   ← entrypoint: node generator/src/cli.js {generate|drift|check}
 │   ├── sources/
-│   │   ├── memo.js              ← parse jason_finance.md (targeted tables only)
-│   │   ├── actual.js            ← Actual Budget HTTP API balance fetch
-│   │   └── manual.js            ← static entries for accounts not in any tracker
-│   ├── reconcile.js             ← pure function: memo + sources → reconciled plan + drift
-│   └── emit.js                  ← validate + write plan.json + report
+│   │   ├── memo.js              ← parse jason_finance.md (Assets+Registry, Income, Targets)
+│   │   ├── actual.js            ← Actual Budget API: balances + 90d category spend
+│   │   └── manual.js            ← static entries for accounts not in any tracker (empty today)
+│   ├── scenarios.js             ← parse ## Scenarios + compose one PL plan per scenario
+│   ├── reconcile.js             ← pure function: memo + sources + rules → reconciled + drift
+│   ├── emit.js                  ← merge into PL plan.json + validate + write or stdout
+│   └── drift-report.js          ← format reconciled output as markdown
 └── tests/
-    ├── cli.test.js
-    ├── reconcile.test.js
-    ├── memo-parse.test.js
+    ├── cli.test.js              ← scaffold-level integration
+    ├── memo-parse.test.js       ← 58 tests on memo parser
+    ├── actual-fetch.test.js     ← 30 tests on Actual source
+    ├── reconcile.test.js        ← 32 tests on reconcile
+    ├── emit.test.js             ← 24 tests on emit
+    ├── scenarios.test.js        ← 34 tests on scenarios
+    ├── drift-report.test.js     ← 18 tests on drift report
     └── fixtures/
         ├── memo.sample.md       ← sanitized example memo
-        └── actual.sample.json   ← sanitized example Actual response
+        └── actual.sample.json   ← sanitized example Actual API response (date placeholders)
 ```
 
 ## CLI surface
@@ -68,14 +75,7 @@ npm run check -- --memo /path
   - `downloadBudget(syncId, opts?)` is positional, not `{ syncId }`. Docs are wrong.
   - The "syncId" parameter is matched against the budget's `groupId` field on the server, NOT `cloudFileId`. Use `target.groupId` from `getBudgets()` output.
 
-## Build sequence (current PR is A)
+## Build sequence (DONE through PR-J as of 2026-05-29)
 
-| PR    | Scope                                                                                                                                     |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **A** | This scaffold — directories, README, CLI skeleton, config, stub modules, placeholder tests. **No real functionality.** Lint + tests pass. |
-| B     | Memo source — parse the Assets table fixture-tested                                                                                       |
-| C     | Actual source — auth, account listing, balance fetch via `@actual-app/api`                                                                |
-| D     | Reconcile — pure function, rules table from config                                                                                        |
-| E     | Emit — validator integration, drift, provenance, `--dry-run`                                                                              |
-| F     | Drift thresholds + polish + better error messages                                                                                         |
-| G     | Runbook docs at `docs/runbooks/generate.md`                                                                                               |
+| PR  | Scope | Commit / status |
+| --- | ----- | --------------- |
