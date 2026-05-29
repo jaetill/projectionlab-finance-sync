@@ -27,6 +27,7 @@
 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
 
 const DEFAULT_SERVER = 'http://localhost:5006';
 const DEFAULT_DATA_DIR_NAME = 'actual-cache';
@@ -205,6 +206,10 @@ export async function fetchActualSnapshot(opts = {}) {
   // doesn't try to resolve the package at transform time. @actual-app/api is
   // a real runtime dep; tests inject opts.api and never hit this branch.
   const api = opts.api ?? (await import(actualApiSpecifier()));
+
+  // @actual-app/api doesn't auto-create dataDir; recursively mkdir so a fresh
+  // user (or a $env:TEMP that's been cleaned) doesn't fail with ENOENT.
+  await mkdir(config.dataDir, { recursive: true });
 
   await api.init({
     dataDir: config.dataDir,

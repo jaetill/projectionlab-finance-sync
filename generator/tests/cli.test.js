@@ -59,4 +59,44 @@ describe('generator scaffold', () => {
     expect(data.driftThresholds).toBeDefined();
     expect(data.accountMapping).toBeDefined();
   });
+
+  it('falls back to MEMO_PATH env var when --memo flag is omitted', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'cli-memo-env-'));
+    const memoPath = join(dir, 'memo.md');
+    const stubMemo = [
+      '# stub',
+      '',
+      '## Assets',
+      '',
+      '| Account | Balance | Notes |',
+      '| ------- | ------- | ----- |',
+      '| Stub    | $0      | x     |',
+      '',
+      '## Income Picture (Monthly)',
+      '',
+      '| Source | Amount | Notes |',
+      '| ------ | ------ | ----- |',
+      '| Salary | $1     | x     |',
+      '',
+    ].join('\n');
+    await writeFile(memoPath, stubMemo);
+    try {
+      const cliPath = resolve(import.meta.dirname, '..', 'src/cli.js');
+      // Clear Actual env so 'check' stops after memo OK without failing on
+      // unreachable Actual server.
+      const env = { ...process.env, MEMO_PATH: memoPath };
+      delete env.ACTUAL_PASSWORD;
+      delete env.ACTUAL_BUDGET_NAME;
+      const result = spawnSync('node', [cliPath, 'check'], { env, encoding: 'utf8' });
+      expect(result.stderr).not.toMatch(/--memo.*required/);
+      expect(result.stdout).toMatch(/memo OK/);
+      expect(result.status).toBe(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

@@ -290,6 +290,27 @@ describe('fetchActualSnapshot (integration with injected api)', () => {
     expect(snap.sanityChecks).toBeDefined();
   });
 
+  it('creates the dataDir before init (no ENOENT on a fresh user temp)', async () => {
+    const { mkdtemp, rm, stat } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const parentDir = await mkdtemp(join(tmpdir(), 'actual-mkdir-test-'));
+    const dataDir = join(parentDir, 'nested', 'actual-cache');
+    try {
+      const fixture = materializeFixture(now);
+      const { api } = makeFakeApi(fixture);
+      await fetchActualSnapshot({
+        env: { ...BASE_ENV, ACTUAL_DATA_DIR: dataDir },
+        api,
+        now,
+      });
+      const st = await stat(dataDir);
+      expect(st.isDirectory()).toBe(true);
+    } finally {
+      await rm(parentDir, { recursive: true, force: true });
+    }
+  });
+
   it('uses groupId (not cloudFileId) for downloadBudget', async () => {
     const fixture = materializeFixture(now);
     const { api, calls } = makeFakeApi(fixture);
