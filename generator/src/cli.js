@@ -19,11 +19,16 @@ import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
+import { writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
+
 import { parseMemo } from './sources/memo.js';
 import { fetchActualSnapshot } from './sources/actual.js';
 import { getManualEntries } from './sources/manual.js';
 import { reconcile } from './reconcile.js';
 import { emit } from './emit.js';
+import { buildDriftReport } from './drift-report.js';
 
 const HELP = `\
 projectionlab-finance-sync generator
@@ -32,12 +37,13 @@ Usage: node generator/src/cli.js <command> [options]
 
 Commands:
   generate    Build data/plan.json from memo + tracker sources
-  drift       Read-only drift summary (no plan.json write)
+  drift       Write data/drift.md (or stdout with --stdout)
   check       Validate memo parsing + tracker auth, no output
 
 Options:
   --memo <path>    Path to the finance memo (required for all commands)
   --dry-run        For 'generate': print plan.json to stdout, don't write
+  --stdout         For 'drift':    print to stdout instead of data/drift.md
   --base <path>    Optional override for the base plan.json to merge into
   --help, -h       Show this help
 
@@ -71,6 +77,7 @@ function parseInvocation(argv) {
       memo: { type: 'string' },
       base: { type: 'string' },
       'dry-run': { type: 'boolean', default: false },
+      stdout: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
     },
     allowPositionals: false,
@@ -86,7 +93,16 @@ function parseInvocation(argv) {
     memoPath,
     basePath: values.base ? resolve(values.base) : null,
     dryRun: values['dry-run'],
+    driftStdout: values.stdout,
   };
+}
+
+function repoRoot() {
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+}
+
+function defaultDriftPath() {
+  return resolve(repoRoot(), 'data', 'drift.md');
 }
 
 async function loadRules() {
@@ -124,31 +140,34 @@ async function cmdGenerate({ memoPath, basePath, dryRun }) {
     dryRun,
     includeEmit: true,
   });
-  if (emitResult.written) {
+  // Always also produce a drift report — when --dry-run is on, drift goes to
+  // stderr so stdout stays usable for the plan.json dump.
+  const driftMd = buildDriftReport(reconciled, { skipped: emitResult.skipped });
+  if (dryRun) {
+    process.stderr.write(`\n${driftMd}\n`);
+  } else {
+    const driftPath = defaultDriftPath();
+    await writeFile(driftPath, driftMd, 'utf8');
     process.stderr.write(
       `[generate] wrote ${emitResult.path}\n` +
-        `  accounts: ${reconciled.accounts.length}\n` +
-        `  drift:    ${reconciled.drift.length}\n` +
-        `  warnings: ${emitResult.warnings.length}\n`,
+        `[generate] wrote ${driftPath}\n` +
+        `  accounts:        ${reconciled.accounts.length}\n` +
+        `  drift entries:   ${reconciled.drift.length}\n` +
+        `  skipped:         ${emitResult.skipped.length}\n` +
+        `  validator warns: ${emitResult.warnings.length}\n`,
     );
   }
 }
 
-async function cmdDrift({ memoPath }) {
+async function cmdDrift({ memoPath, driftStdout }) {
   const { reconciled } = await runPipeline({ memoPath, includeEmit: false });
-  process.stdout.write(
-    `drift entries:      ${reconciled.drift.length}\n` +
-      `unmatched memo:     ${reconciled.unmatchedMemo.length}\n` +
-      `unmatched tracker:  ${reconciled.unmatchedActual.length}\n`,
-  );
-  if (reconciled.sanityChecks) {
-    const s = reconciled.sanityChecks;
-    process.stdout.write(
-      `sanity:\n` +
-        `  unmarked transfers: ${s.unmarkedTransfers}\n` +
-        `  uncategorized:      ${s.uncategorized}\n` +
-        `  stale accounts:     ${s.staleAccounts.length}\n`,
-    );
+  const driftMd = buildDriftReport(reconciled);
+  if (driftStdout) {
+    process.stdout.write(driftMd);
+  } else {
+    const driftPath = defaultDriftPath();
+    await writeFile(driftPath, driftMd, 'utf8');
+    process.stderr.write(`[drift] wrote ${driftPath}\n`);
   }
 }
 
