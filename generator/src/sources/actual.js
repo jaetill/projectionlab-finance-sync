@@ -236,6 +236,17 @@ export async function fetchActualSnapshot(opts = {}) {
       api.getCategoryGroups(),
     ]);
 
+    // getAccounts() does NOT populate a usable `balance`. The field is absent on
+    // the record, and the `balance_current` it sometimes carries disagrees with
+    // Actual's computed balance and is `null` for several off-budget accounts
+    // (TSP, mortgage, 529s). getAccountBalance(id) returns the authoritative,
+    // UI-matching balance in cents. See [[reference_actual_api_gotchas]] gotcha
+    // #3. Verified 2026-05-29 against the live "My Finances" budget: e.g.
+    // Savings 1146 -> 5576688 cents ($55,766.88), matching the UI.
+    for (const acct of rawAccounts) {
+      acct.balance = await api.getAccountBalance(acct.id);
+    }
+
     const catById = new Map(rawCategories.map((c) => [c.id, c]));
     const groupById = new Map(rawGroups.map((g) => [g.id, g]));
 
