@@ -35,20 +35,14 @@
     "truist-checking": {
       "actualId": "681154f2-da28-4d8c-bb74-8d4e33151e21",
       "actualName": "Checking 8066 (8066)"
-    }
-  },
-  "pendingMappings": {
-    "comment": "Verified Actual UUIDs whose memo counterpart does not exist yet. Ignored by reconcile. Add the memo row (matching externalId slug), then move the entry up into accountMapping. See memo-pr-i-additions sidecar in the Financial Decisions workspace.",
-    "ally-cds-split": {
-      "note": "Memo has a single 'Ally CDs' row ($71,745 total). Split into the two CDs below + the memo-only Austin Car Fund before mapping.",
-      "high-yield-cd-18-month": {
-        "actualId": "35211f5e-3ac6-4d9f-beff-133fe5cf7aed",
-        "actualName": "High Yield CD - 18 Month (7042)"
-      },
-      "high-yield-cd-9-month": {
-        "actualId": "48cb14c1-7a0d-4f9d-a9a3-d707ba7546b4",
-        "actualName": "High Yield CD - 9 Month (1578)"
-      }
+    },
+    "ally-cd-college-years-5-6-or-car": {
+      "actualId": "35211f5e-3ac6-4d9f-beff-133fe5cf7aed",
+      "actualName": "High Yield CD - 18 Month (7042)"
+    },
+    "ally-cd-college-year-3-4": {
+      "actualId": "48cb14c1-7a0d-4f9d-a9a3-d707ba7546b4",
+      "actualName": "High Yield CD - 9 Month (1578)"
     },
     "virginia-529-carston": {
       "actualId": "9847006a-06f7-4e9d-809f-5f3af2656ba3",
@@ -70,7 +64,7 @@
       "actualId": "9c45b422-5f55-4ef5-bf55-704cd7e74354",
       "actualName": "Personal Money Rate SAV 5518 (5518)"
     },
-    "chase-mortgage": {
+    "33-biscayne-mortgage": {
       "actualId": "a3364d12-c2be-438e-96f7-d4eaeb4cd390",
       "actualName": "MORTGAGE LOAN (7523)"
     }
