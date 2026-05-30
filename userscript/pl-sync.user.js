@@ -250,9 +250,11 @@
     await runStep('restore-current-finances', function () {
       return pl.restoreCurrentFinances(plan.today, options);
     }, result);
-    await runStep('restore-plans', function () {
-      return pl.restorePlans(plan.plans, options);
-    }, result);
+    // restorePlans intentionally DISABLED — PL's internal plan migrations
+    // (priorities funding-type sort, drawdown module lookups) are too brittle
+    // to satisfy from outside the UI. Scenarios are owned inside
+    // ProjectionLab; we only sync current finances. rollbackTo still restores
+    // both today and plans from a captured snapshot.
 
     result.finishedAt = Date.now();
     return result;

@@ -79,17 +79,21 @@ export async function syncPlan(plan, pl, apiKey, now = () => Date.now()) {
   }
   result.rollbackSnapshot = step2.value;
 
-  // 3. restoreCurrentFinances
+  // 3. restoreCurrentFinances — the accounts side (today balances). This is
+  // the part Actual Budget drives and is what the user actually needs synced
+  // continuously.
   await runStep(
     'restore-current-finances',
     () => pl.restoreCurrentFinances(plan.today, options),
     result,
   );
 
-  // 4. restorePlans — even if step 3 failed, we still attempt 4 so the user
-  // gets a complete picture of what worked and what didn't. They can always
-  // roll back from the snapshot.
-  await runStep('restore-plans', () => pl.restorePlans(plan.plans, options), result);
+  // restorePlans is intentionally DISABLED. PL runs internal schema
+  // migrations on imported plans (priorities funding-type sorts, drawdown
+  // module lookups, etc.) that proved too brittle to satisfy from outside
+  // PL's UI without reverse-engineering its bundle. Scenarios are owned and
+  // edited inside ProjectionLab; the userscript only syncs current finances.
+  // See the project memory note `project_pl_actual_reconciliation_state.md`.
 
   result.finishedAt = now();
   return result;
