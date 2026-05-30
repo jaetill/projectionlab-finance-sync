@@ -22,7 +22,7 @@ describe('syncPlan', () => {
     expect(pl.validateApiKey).not.toHaveBeenCalled();
   });
 
-  it('runs the full 4-step sequence on a valid plan', async () => {
+  it('runs the accounts-only sequence on a valid plan (restorePlans intentionally skipped)', async () => {
     const pl = makePluginApiStub();
     const plan = makeValidPlan();
     const result = await syncPlan(plan, pl, 'apikey');
@@ -31,13 +31,15 @@ describe('syncPlan', () => {
     expect(pl.validateApiKey).toHaveBeenCalledWith({ key: 'apikey' });
     expect(pl.exportData).toHaveBeenCalledWith({ key: 'apikey' });
     expect(pl.restoreCurrentFinances).toHaveBeenCalledWith(plan.today, { key: 'apikey' });
-    expect(pl.restorePlans).toHaveBeenCalledWith(plan.plans, { key: 'apikey' });
+    // Scenarios are owned inside ProjectionLab now — syncPlan must never call
+    // restorePlans. PL's internal migrations (priorities funding-type sort,
+    // drawdown module lookups) are too brittle to satisfy from outside the UI.
+    expect(pl.restorePlans).not.toHaveBeenCalled();
 
     expect(result.steps.map((s) => s.name)).toEqual([
       'validate-api-key',
       'export-data',
       'restore-current-finances',
-      'restore-plans',
     ]);
     expect(result.steps.every((s) => s.ok)).toBe(true);
   });
@@ -89,7 +91,7 @@ describe('syncPlan', () => {
     expect(result.errors.some((e) => e.scope === 'export-data')).toBe(true);
   });
 
-  it('still attempts restorePlans even if restoreCurrentFinances fails', async () => {
+  it('records the restore-current-finances failure and does not call restorePlans', async () => {
     const pl = makePluginApiStub({
       restoreCurrentFinances: vi.fn(async () => {
         throw new Error('today failed');
@@ -98,7 +100,8 @@ describe('syncPlan', () => {
     const result = await syncPlan(makeValidPlan(), pl, 'apikey');
 
     expect(result.ok).toBe(false);
-    expect(pl.restorePlans).toHaveBeenCalled();
+    // restorePlans is now intentionally never called from syncPlan.
+    expect(pl.restorePlans).not.toHaveBeenCalled();
     expect(result.errors.some((e) => e.scope === 'restore-current-finances')).toBe(true);
   });
 
